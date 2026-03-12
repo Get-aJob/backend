@@ -42,6 +42,10 @@ Thumbs.db
 docs
 docs/**
 
+# prompts
+prompts
+prompts/**
+
 # local tooling artifacts
 terminals/
 agent-transcripts/
