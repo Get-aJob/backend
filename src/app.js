@@ -13,6 +13,9 @@ app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ tetended: true }))
 
+// 테스트를 위한 작업입니다.
+
+
 // Swagger 설정
 const swaggerOptions = {
   definition: {
