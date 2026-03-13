@@ -19,8 +19,8 @@ const router = express.Router()
  *                   type: string
  *                   example: ok
  *                 uptime:
- *                   type: number
- *                   example: 123.45
+ *                   type: string
+ *                   example: HH:mm:ss
  */
 router.get('/healthy', (req, res) => {
   res.status(200).json({
