@@ -1,0 +1,13 @@
+services:
+  #1. 백엔드 서버 컨테이너
+  app:
+    build:
+      context: .
+      args:
+        - PORT=${PORT:-3000} # .env의 PORT 값을 Dockerfile의 ARG로 전달
+    container_name: moa-backend
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}" #로컬 포트 : 컨테이너 포트 연결
+    env_file:
+      - .env # .env 파일을 컨테이너 내부로 주입
+    restart: always
