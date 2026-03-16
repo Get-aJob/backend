@@ -86,10 +86,24 @@ export interface UpdateResumeBody {
   resume?: Partial<ResumeContent>;
 }
 
-// 이력서 목록 상세 응답
-export interface ResumeResponse {
+// 이력서 목록 응답 (목록 조회, 업로드 시 사용)
+export interface ResumeListResponse {
   id: string;
   title: string;
   createdAt: string;
-  updatedAt?: string;
+}
+
+// 이력서 상세 응답 (상세 조회 시 사용)
+export interface ResumeDetailResponse {
+  id: string;
+  title: string;
+  content: ResumeContent;
+  createdAt: string;
+}
+
+// 이력서 수정 응답
+export interface ResumeUpdateResponse {
+  id: string;
+  title: string;
+  updatedAt: string;
 }

@@ -1,6 +1,12 @@
 import { Request, Response } from "express";
 import * as resumeService from "../services/resumeService";
-import { CreateResumeBody, UpdateResumeBody } from "../types/resume";
+import {
+  CreateResumeBody,
+  UpdateResumeBody,
+  ResumeListResponse,
+  ResumeDetailResponse,
+  ResumeUpdateResponse,
+} from "../types/resume";
 
 // 이력서 업로드 (생성)
 export async function uploadResume(req: Request, res: Response): Promise<void> {
