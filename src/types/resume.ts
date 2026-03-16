@@ -68,6 +68,12 @@ export interface ResumeRecord {
   updated_at: string;
 }
 
+// 이력서 목록 조회를 위한 경량화된 타입
+export type ResumeListItem = Pick<
+  ResumeRecord,
+  "id" | "title" | "created_at" | "updated_at"
+>;
+
 // 이력서 생성 요청 바디
 export interface CreateResumeBody {
   title: string;

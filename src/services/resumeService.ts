@@ -1,5 +1,5 @@
 const { supabase } = require("../lib/supabase");
-import { ResumeContent, ResumeRecord } from "../types/resume";
+import { ResumeContent, ResumeRecord, ResumeListItem } from "../types/resume";
 
 // 이력서 생성
 
@@ -29,7 +29,7 @@ export async function createResume(
 
 export async function getResumesByUser(
   userId: string,
-): Promise<ResumeRecord[]> {
+): Promise<ResumeListItem[]> {
   const { data, error } = await supabase
     .from("resumes")
     .select("id, title, created_at, updated_at")
@@ -40,7 +40,7 @@ export async function getResumesByUser(
     throw new Error(`이력서 목록 조회 실패: ${error.message}`);
   }
 
-  return (data ?? []) as ResumeRecord[];
+  return (data ?? []) as ResumeListItem[];
 }
 
 //이력서 상세 조회

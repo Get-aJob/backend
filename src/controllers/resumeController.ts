@@ -23,7 +23,7 @@ export async function uploadResume(req: Request, res: Response): Promise<void> {
     });
   } catch (err) {
     console.error("이력서 업로드 오류:", err);
-    res.status(400).json({ error: "이력서 업로드에 실패했습니다." });
+    res.status(500).json({ error: "이력서 업로드에 실패했습니다." });
   }
 }
 
@@ -104,7 +104,7 @@ export async function updateResume(req: Request, res: Response): Promise<void> {
     });
   } catch (err) {
     console.error("이력서 수정 오류:", err);
-    res.status(400).json({ error: "이력서 수정에 실패했습니다." });
+    res.status(500).json({ error: "이력서 수정에 실패했습니다." });
   }
 }
 
