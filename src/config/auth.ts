@@ -47,7 +47,7 @@ export function refreshCookieOptions(): CookieOptions {
     secure: authConfig.cookie.secure,
     sameSite: authConfig.cookie.sameSite,
     domain: authConfig.cookie.domain,
-    path: "auth/refresh", // refresh는 refresh endpoint에서만 자동 전송
+    path: "/auth/refresh", // refresh는 refresh endpoint에서만 자동 전송
     maxAge: 14 * 24 * 60 * 60 * 1000, // 14일
   };
 }

@@ -7,7 +7,7 @@ function sha256(input: string) {
   return crypto.createHash("sha256").update(input).digest("hex");
 }
 
-export async function registeUser({
+export async function registerUser({
   email,
   password,
   name,

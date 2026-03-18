@@ -1,4 +1,4 @@
-const { supabase } = require("../lib/supabase");
+import { supabase } from "../lib/supabase";
 
 export async function getAllUsers() {
   const { data, error } = await supabase
@@ -7,9 +7,9 @@ export async function getAllUsers() {
       "id, email, name, profile_image_url, email_notification, created_at, updated_at",
     );
 
-  if (error as Error) {
+  if (error) {
     throw new Error(error.message);
-  } else {
-    return data ?? [];
   }
+
+  return data ?? [];
 }

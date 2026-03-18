@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { registeUser, loginUser } from "../services/authService";
+import { registerUser, loginUser } from "../services/authService";
 import { accessCookieOptions, refreshCookieOptions } from "../config/auth";
 import { logger } from "../utils/logger";
 
@@ -11,7 +11,7 @@ export async function join(req: Request, res: Response) {
     return res.status(400).json({ error: "필수 정보를 입력하지 않았습니다." });
   }
 
-  const user = await registeUser({ email, password, name });
+  const user = await registerUser({ email, password, name });
   logger.info("회원가입 성공:", { email: user.email });
   return res.status(201).json({ message: "회원가입에 성공했습니다." });
 }
