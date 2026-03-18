@@ -72,7 +72,7 @@ function toApiApplication(row: any) {
 }
 
 function getAuthUserId(req: AuthRequest, res: Response<any, AuthLocals>) {
-  return res.locals.user?.id || req.user?.id || (req.query?.userId as string | undefined) || (req.body?.userId as string | undefined)
+  return res.locals.user?.id || req.user?.id
 }
 
 export async function listApplications(req: Request, res: Response) {

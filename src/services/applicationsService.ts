@@ -26,8 +26,6 @@ export async function getAllApplications() {
     .from(TABLE_NAME)
     .select('*')
     .order('id', { ascending: true })
-    .order('created_at', { ascending: false, foreignTable: 'application_status_histories' })
-    .limit(1, { foreignTable: 'application_status_histories' })
 
   if (error) {
     const e = new Error(error.message) as Error & { code?: string }
@@ -158,13 +156,16 @@ export async function getApplicationsByJob(jobPostingId: string) {
 
 export async function getApplicationsByDate(date: string) {
   const from = `${date}T00:00:00Z`
-  const to = `${date}T23:59:59Z`
+  // 다음 날 00:00:00 이전까지 조회
+  const nextDate = new Date(date)
+  nextDate.setDate(nextDate.getDate() + 1)
+  const to = nextDate.toISOString().split('T')[0] + 'T00:00:00Z'
 
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('*, job_postings(title, content, company_name), application_statuses(display_name)')
     .gte('applied_at', from)
-    .lte('applied_at', to)
+    .lt('applied_at', to)
     .order('applied_at', { ascending: true })
 
   if (error) {
