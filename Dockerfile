@@ -11,8 +11,11 @@ RUN npm install
 # 4. 나머지 소스 코드 복사
 COPY . .
 
-# 5. 컨테이너에서 노출할 포트 (서버에서 사용하는 포트에 맞게 수정)
+# 5. TypeScript 빌드
+RUN npm run build
+
+# 6. 컨테이너에서 노출할 포트 (서버에서 사용하는 포트에 맞게 수정)
 EXPOSE 3000
 
-# 6. 서버 실행 명령어
-CMD ["node", "server.js"]
+# 7. 서버 실행 (빌드 결과 사용)
+CMD ["npm", "start"]
