@@ -13,7 +13,11 @@ import authRouter from "./routes/auth";
 const app = express();
 
 const corpsOptions = {
-  origin: ["https://job-moa-fe.vercel.app", "http://localhost:5173"],
+  origin: [
+    "https://job-moa-fe.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3009",
+  ],
   credentials: true,
 };
 
