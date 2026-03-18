@@ -34,9 +34,7 @@ Thumbs.db
 .vscode/
 
 # Cursor (keep rules tracked)
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
+.cursor
 
 # docs
 docs

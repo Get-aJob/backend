@@ -1,6 +1,6 @@
-require("ts-node/register");
-require("dotenv").config();
-const app = require("./src/app");
+// require("ts-node/register");
+import "dotenv/config";
+import app from "./src/app";
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {

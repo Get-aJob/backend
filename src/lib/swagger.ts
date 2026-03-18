@@ -1,5 +1,5 @@
-const swaggerUi = require('swagger-ui-express')
-const swaggerJsdoc = require('swagger-jsdoc')
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
 
 // Swagger 설정
 const swaggerOptions = {
@@ -14,8 +14,4 @@ const swaggerOptions = {
   apis: ['./src/routes/*.js'], // JSDoc 주석을 읽어올 파일 경로
 }
 
-const swaggerSpec = swaggerJsdoc(swaggerOptions)
-
-module.exports = {
-  swaggerSpec
-}
+export const swaggerSpec = swaggerJsdoc(swaggerOptions)
