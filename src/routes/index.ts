@@ -1,6 +1,8 @@
-const express = require('express')
-const { formatUptime } = require('../utils/time')
-const router = express.Router()
+import express from "express";
+import { formatUptime } from "../utils/time";
+
+const router = express.Router();
+
 /**
  * @openapi
  * /healthy:
@@ -22,11 +24,11 @@ const router = express.Router()
  *                   type: string
  *                   example: HH:mm:ss
  */
-router.get('/healthy', (req, res) => {
+router.get("/healthy", (req, res) => {
   res.status(200).json({
-    status: 'ok',
+    status: "ok",
     uptime: formatUptime(process.uptime()),
-  })
-})
+  });
+});
 
-module.exports = router
+export default router;

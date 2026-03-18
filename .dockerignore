@@ -5,6 +5,8 @@ npm-debug.log
 .github
 .git
 
+.cursor
+
 .env
 
 docs
