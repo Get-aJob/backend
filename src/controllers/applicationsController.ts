@@ -99,15 +99,18 @@ export async function listApplicationsByUser(req: AuthRequest, res: Response<any
   }
 }
 
-export async function getApplication(req: Request, res: Response) {
+export async function getApplication(req: AuthRequest, res: Response<any, AuthLocals>) {
   try {
-    const id = String(req.params.id)
+    const id = String(req.params.id);
+    const authUserId = getAuthUserId(req, res)
+    if (!authUserId) {
+      return res.status(401).json({ error: '권한이 없습니다.' })
+    }
     const data = await getApplicationById(id)
     if (!data) {
       return res.status(404).json({ error: '지원 정보를 찾을 수 없습니다.' })
     }
-    const authUserId = (res.locals as AuthLocals).user?.id
-    if (authUserId && data.user_id !== authUserId) {
+    if (data.user_id !== authUserId) {
       return res.status(403).json({ error: '권한이 없습니다. 본인 지원 건만 조회 가능합니다.' })
     }
     res.status(200).json({ application: toApiApplication(data) })
@@ -166,7 +169,8 @@ export async function updateApplicationHandler(req: AuthRequest, res: Response<a
       return res.status(403).json({ error: '권한이 없습니다. 본인 지원 건만 수정 가능합니다.' })
     }
 
-    const updates = toDbApplication(req.body)
+    const updates = toDbApplication(req.body);
+    delete updates.user_id; // user_id는 업데이트에서 제외
     const invalidField = findInvalidUuidField(updates)
     if (invalidField) {
       return res.status(400).json({ error: `${invalidField} 값이 UUID 형식이 아닙니다.` })

@@ -3,13 +3,13 @@ import { supabase } from '../lib/supabase.js'
 const TABLE_NAME = 'applications'
 const STATUS_TABLE_NAME = 'application_status_histories'
 
-async function insertStatusHistory(applicationId: string, statusId: string, changedByUserId?: string) {
+async function insertStatusHistory(applicationId: string, toStatusId: string, changedByUserId?: string, fromStatusId?: string) {
   const { error } = await supabase
     .from(STATUS_TABLE_NAME)
     .insert({
       application_id: applicationId,
-      from_status_id: null,
-      to_status_id: statusId,
+      from_status_id: fromStatusId ?? null,
+      to_status_id: toStatusId,
       changed_by_user_id: changedByUserId,
       changed_at: new Date().toISOString(),
     })
@@ -24,7 +24,7 @@ async function insertStatusHistory(applicationId: string, statusId: string, chan
 export async function getAllApplications() {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('*, application_statuses(display_name)')
     .order('id', { ascending: true })
 
   if (error) {
@@ -56,7 +56,7 @@ export async function createApplication(application: Record<string, unknown>, st
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .insert(application)
-    .select('*')
+    .select('*, application_statuses(display_name)')
     .single()
 
   if (error) {
@@ -66,7 +66,13 @@ export async function createApplication(application: Record<string, unknown>, st
   }
 
   if (statusId) {
-    await insertStatusHistory(data.id, statusId, application.user_id as string)
+    try {
+      await insertStatusHistory(data.id, statusId, application.user_id as string)
+    } catch (err) {
+      // 상태 이력 저장 실패 시 생성된 지원 데이터도 롤백
+      await supabase.from(TABLE_NAME).delete().eq('id', data.id)
+      throw err
+    }
   }
 
   return data ?? []
@@ -75,13 +81,20 @@ export async function createApplication(application: Record<string, unknown>, st
 export async function updateApplication(id: string, updates: Record<string, unknown>, statusId?: string, changedByUserId?: string) {
   const hasApplicationFieldUpdates = Object.keys(updates ?? {}).length > 0
 
+  // 상태 변경 이력에 from_status_id 기록을 위해 업데이트 전 기존 status_id 조회
+  let fromStatusId: string | undefined
+  if (statusId) {
+    const current = await getApplicationById(id)
+    fromStatusId = (current?.status_id as string | undefined) ?? undefined
+  }
+
   let data: any = null
   if (hasApplicationFieldUpdates) {
     const { data: updatedData, error } = await supabase
       .from(TABLE_NAME)
       .update(updates)
       .eq('id', id)
-      .select('*')
+      .select('*, application_statuses(display_name)')
       .maybeSingle()
 
     if (error) {
@@ -100,7 +113,17 @@ export async function updateApplication(id: string, updates: Record<string, unkn
   }
 
   if (statusId) {
-    await insertStatusHistory(id, statusId, changedByUserId)
+    try {
+      await insertStatusHistory(id, statusId, changedByUserId, fromStatusId)
+    } catch (err) {
+      // 상태 이력 저장 실패 시 수정된 내용을 원복
+      if (hasApplicationFieldUpdates) {
+        await supabase.from(TABLE_NAME).update(Object.fromEntries(
+          Object.keys(updates).map(k => [k, (data as any)[k]])
+        )).eq('id', id)
+      }
+      throw err
+    }
   }
 
   return data
@@ -157,9 +180,9 @@ export async function getApplicationsByJob(jobPostingId: string) {
 export async function getApplicationsByDate(date: string) {
   const from = `${date}T00:00:00Z`
   // 다음 날 00:00:00 이전까지 조회
-  const nextDate = new Date(date)
-  nextDate.setDate(nextDate.getDate() + 1)
-  const to = nextDate.toISOString().split('T')[0] + 'T00:00:00Z'
+  const nextDate = new Date(`${date}T00:00:00.000Z`)
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1)
+  const to = nextDate.toISOString()
 
   const { data, error } = await supabase
     .from(TABLE_NAME)
