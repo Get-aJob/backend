@@ -9,6 +9,7 @@ import usersRouter from "./routes/users";
 import errorRouter from "./routes/error";
 import resumeRoutes from "./routes/resumeRoutes";
 import authRouter from "./routes/auth";
+import applicationRouter from "./routes/applicationsRoutes";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/", indexRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);
 app.use("/api/resumes", resumeRoutes);
+app.use("/applications", applicationRouter);
 
 app.use(errorRouter);
 
