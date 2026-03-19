@@ -202,7 +202,7 @@ router.put('/:id', requireAuth, updateApplicationHandler);
  *         description: 지원 ID
  *     responses:
  *       204:
- *         description: 지원 삭제 성공
+ *         description: 지원 삭제 성공 (No Content)
  *       401:
  *         description: 인증 실패
  *       403:
