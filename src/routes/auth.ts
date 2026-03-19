@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { join, login, me } from "../controllers/authController";
+import {
+  join,
+  login,
+  me,
+  logout,
+  refresh,
+} from "../controllers/authController";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -171,5 +177,57 @@ router.post("/login", login);
  *         description: 인증 실패
  */
 router.get("/me", requireAuth, me);
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: 로그아웃
+ *     description: 인증 쿠키(access_token, refresh_token)를 제거해 로그아웃합니다.
+ *     responses:
+ *       200:
+ *         description: 로그아웃 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 로그아웃에 성공했습니다.
+ */
+router.post("/logout", logout);
+
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     tags: [Auth]
+ *     summary: 토큰 재발급
+ *     description: refresh_token 쿠키를 검증하고 access/refresh 토큰을 회전 발급합니다.
+ *     responses:
+ *       200:
+ *         description: 재발급 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 토큰이 재발급되었습니다.
+ *       401:
+ *         description: refresh 검증 실패 또는 재사용 감지
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: TOKEN_REUSE_DETECTED
+ */
+router.post("/refresh", refresh);
 
 export default router;
