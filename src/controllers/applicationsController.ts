@@ -127,9 +127,14 @@ export async function createApplicationHandler(req: AuthRequest, res: Response<a
       return res.status(401).json({ error: '권한이 없습니다.' })
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       ...toDbApplication(req.body),
       user_id: userId,
+    }
+
+    const rawAppliedAt = (req.body?.applied_at ?? req.body?.appliedAt) as string | undefined
+    if (rawAppliedAt === '') {
+      payload.applied_at = null
     }
 
     const invalidField = findInvalidUuidField(payload)
@@ -169,7 +174,11 @@ export async function updateApplicationHandler(req: AuthRequest, res: Response<a
       return res.status(403).json({ error: '권한이 없습니다. 본인 지원 건만 수정 가능합니다.' })
     }
 
-    const updates = toDbApplication(req.body);
+    const updates = toDbApplication(req.body)
+    const rawAppliedAt = (req.body?.applied_at ?? req.body?.appliedAt) as string | undefined
+    if (rawAppliedAt === '') {
+      updates.applied_at = null
+    }
     delete updates.user_id; // user_id는 업데이트에서 제외
     const invalidField = findInvalidUuidField(updates)
     if (invalidField) {

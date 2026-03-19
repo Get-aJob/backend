@@ -81,6 +81,8 @@ export async function createApplication(application: Record<string, unknown>, st
 export async function updateApplication(id: string, updates: Record<string, unknown>, statusId?: string, changedByUserId?: string) {
   const hasApplicationFieldUpdates = Object.keys(updates ?? {}).length > 0
 
+  let originalData: any = null
+
   // 상태 변경 이력에 from_status_id 기록을 위해 업데이트 전 기존 status_id 조회
   let fromStatusId: string | undefined
   if (statusId) {
@@ -88,8 +90,15 @@ export async function updateApplication(id: string, updates: Record<string, unkn
     fromStatusId = (current?.status_id as string | undefined) ?? undefined
   }
 
+  const hasStatusChanged = !!statusId && statusId !== fromStatusId
+
   let data: any = null
   if (hasApplicationFieldUpdates) {
+    originalData = await getApplicationById(id)
+    if (!originalData) {
+      return null
+    }
+
     const { data: updatedData, error } = await supabase
       .from(TABLE_NAME)
       .update(updates)
@@ -112,14 +121,14 @@ export async function updateApplication(id: string, updates: Record<string, unkn
     return null
   }
 
-  if (statusId) {
+  if (hasStatusChanged) {
     try {
       await insertStatusHistory(id, statusId, changedByUserId, fromStatusId)
     } catch (err) {
       // 상태 이력 저장 실패 시 수정된 내용을 원복
-      if (hasApplicationFieldUpdates) {
+      if (hasApplicationFieldUpdates && originalData) {
         await supabase.from(TABLE_NAME).update(Object.fromEntries(
-          Object.keys(updates).map(k => [k, (data as any)[k]])
+          Object.keys(updates).map(k => [k, (originalData as any)[k]])
         )).eq('id', id)
       }
       throw err
@@ -130,6 +139,17 @@ export async function updateApplication(id: string, updates: Record<string, unkn
 }
 
 export async function deleteApplication(id: string) {
+  const { error: historyError } = await supabase
+    .from(STATUS_TABLE_NAME)
+    .delete()
+    .eq('application_id', id)
+
+  if (historyError) {
+    const e = new Error(historyError.message) as Error & { code?: string }
+    e.code = historyError.code
+    throw e
+  }
+
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .delete()
