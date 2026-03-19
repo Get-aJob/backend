@@ -13,3 +13,14 @@ export async function getAllUsers() {
 
   return data ?? [];
 }
+
+export async function withdraw(userId: string) {
+  const { error } = await supabase.rpc("withdraw_user_hard_delete", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return { ok: true as const };
+}

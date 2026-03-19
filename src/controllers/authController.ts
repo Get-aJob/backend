@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
-import { registerUser, loginUser } from "../services/authService";
+import {
+  registerUser,
+  loginUser,
+  rotateRefreshToken,
+} from "../services/authService";
 import { accessCookieOptions, refreshCookieOptions } from "../config/auth";
 import { logger } from "../utils/logger";
 
@@ -45,11 +49,66 @@ export async function me(req: Request, res: Response) {
 }
 
 export async function refresh(req: Request, res: Response) {
-  // 0-3-7에서 구현: refresh 쿠키 검증 + 롤링 + access 재발급
-  res.status(501).json({ error: "NOT_IMPLEMENTED" });
+  const token = req.cookies?.refresh_token as string | undefined;
+  if (!token) {
+    return res.status(401).json({ error: "UNAUTHORIZED" });
+  }
+
+  const result = await rotateRefreshToken(token);
+
+  if (!result.ok) {
+    // 침해 의심 시 쿠키 즉시 정리
+    res.clearCookie("access_token", {
+      httpOnly: true,
+      secure: accessCookieOptions().secure,
+      sameSite: accessCookieOptions().sameSite,
+      domain: accessCookieOptions().domain,
+      path: accessCookieOptions().path,
+    });
+    res.clearCookie("refresh_token", {
+      httpOnly: true,
+      secure: refreshCookieOptions().secure,
+      sameSite: refreshCookieOptions().sameSite,
+      domain: refreshCookieOptions().domain,
+      path: refreshCookieOptions().path,
+    });
+    return res.status(401).json({
+      error:
+        result.code === "REUSE_DETECTED"
+          ? "TOKEN_REUSE_DETECTED"
+          : "UNAUTHORIZED",
+    });
+  }
+
+  // rotate 성공: 신규 access/refresh 재쿠키 세팅
+  res.cookie("access_token", result.accessToken, accessCookieOptions());
+  res.cookie("refresh_token", result.refreshToken, refreshCookieOptions());
+  logger.info("토큰 재발급 성공");
+  return res.status(200).json({ message: "토큰이 재발급되었습니다." });
 }
 
 export async function logout(req: Request, res: Response) {
-  // 0-3-8에서 구현: 쿠키 삭제 + refresh 폐기
-  res.status(501).json({ error: "NOT_IMPLEMENTED" });
+  // 1) refresh 폐기 로직이 있다면 여기서 수행
+  // 예: await revokeRefreshToken(...)
+
+  // 2) access 쿠키 삭제 (로그인 시와 동일한 path/domain/sameSite/secure를 맞춰야 삭제됨)
+  res.clearCookie("access_token", {
+    httpOnly: true,
+    secure: accessCookieOptions().secure,
+    sameSite: accessCookieOptions().sameSite,
+    domain: accessCookieOptions().domain,
+    path: accessCookieOptions().path,
+  });
+
+  // 3) refresh 쿠키 삭제 (path가 /auth/refresh 이므로 반드시 동일하게 맞춰야 함)
+  res.clearCookie("refresh_token", {
+    httpOnly: true,
+    secure: refreshCookieOptions().secure,
+    sameSite: refreshCookieOptions().sameSite,
+    domain: refreshCookieOptions().domain,
+    path: refreshCookieOptions().path,
+  });
+
+  logger.info("유저 로그아웃");
+  return res.status(200).json({ message: "로그아웃에 성공했습니다." });
 }
