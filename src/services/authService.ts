@@ -50,7 +50,7 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   // [3] DB에서 현재 refresh 레코드 조회
   const { data: current, error } = await supabase
     .from("refresh_tokens")
-    .select("user_id, token_hash, expires_at, revoded_at")
+    .select("user_id, token_hash, expires_at, revoked_at")
     .eq("token_hash", tokenHash)
     .single();
 
@@ -70,7 +70,7 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   // [5] 토큰이 존재하더라도 이미 revoke 되었거나 만료되었으면 비정상 사용으로 본다.
   // 이 경우도 보수적으로 전체 세션 revoke 처리해 추가 피해를 차단한다.
   if (
-    current.revoded_at ||
+    current.revoked_at ||
     new Date(current.expires_at).getTime() < Date.now()
   ) {
     await supabase
