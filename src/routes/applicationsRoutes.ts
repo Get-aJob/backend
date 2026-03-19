@@ -27,9 +27,7 @@ const router = Router();
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Application'
+ *               $ref: '#/components/schemas/ApplicationsResponse'
  *       401:
  *         description: 인증 실패
  */
@@ -49,18 +47,7 @@ router.get('/user', requireAuth, listApplicationsByUser);
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: string
- *                   display_name:
- *                     type: string
- *                   is_active:
- *                     type: boolean
- *                   display_order:
- *                     type: number
+ *               $ref: '#/components/schemas/ApplicationStatusesResponse'
  */
 router.get('/statuses', listStatus);
 
@@ -87,7 +74,7 @@ router.get('/statuses', listStatus);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Application'
+ *               $ref: '#/components/schemas/ApplicationResponse'
  *       401:
  *         description: 인증 실패
  *       403:
@@ -136,12 +123,12 @@ router.get('/:id', requireAuth, getApplication);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Application'
+ *               $ref: '#/components/schemas/ApplicationResponse'
  *       400:
  *         description: 필수 필드 누락 또는 유효하지 않은 데이터
  *       401:
  *         description: 인증 실패
- *       23505:
+ *       409:
  *         description: 동일한 공고에 이미 지원함
  */
 router.post('/', requireAuth, createApplicationHandler);
@@ -186,7 +173,7 @@ router.post('/', requireAuth, createApplicationHandler);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Application'
+ *               $ref: '#/components/schemas/ApplicationResponse'
  *       401:
  *         description: 인증 실패
  *       403:
@@ -214,7 +201,7 @@ router.put('/:id', requireAuth, updateApplicationHandler);
  *           type: string
  *         description: 지원 ID
  *     responses:
- *       200:
+ *       204:
  *         description: 지원 삭제 성공
  *       401:
  *         description: 인증 실패
@@ -251,14 +238,44 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *         notes:
  *           type: string
  *           description: 메모
- *         createdAt:
+ *         status:
  *           type: string
- *           format: date-time
- *           description: 생성일시
- *         updatedAt:
+ *           nullable: true
+ *           description: 지원 상태명
+ *         jobPostings:
+ *           type: object
+ *           nullable: true
+ *           description: 연관 채용공고 정보
+ *     ApplicationResponse:
+ *       type: object
+ *       properties:
+ *         application:
+ *           $ref: '#/components/schemas/Application'
+ *     ApplicationsResponse:
+ *       type: object
+ *       properties:
+ *         applications:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Application'
+ *     ApplicationStatus:
+ *       type: object
+ *       properties:
+ *         id:
  *           type: string
- *           format: date-time
- *           description: 수정일시
+ *         display_name:
+ *           type: string
+ *         is_active:
+ *           type: boolean
+ *         display_order:
+ *           type: number
+ *     ApplicationStatusesResponse:
+ *       type: object
+ *       properties:
+ *         statuses:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/ApplicationStatus'
  *   securitySchemes:
  *     cookieAuth:
  *       type: apiKey
