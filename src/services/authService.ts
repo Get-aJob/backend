@@ -212,3 +212,73 @@ export async function loginUser({
     refreshToken,
   };
 }
+// 메모리 저장(개발용). 운영에서는 redis/DB 권장
+const resetSessionStore = new Map<
+  string,
+  { userId: string; expiresAt: number }
+>();
+
+function generateResetToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+export async function requestPasswordResetService(params: {
+  email: string;
+  name: string;
+}) {
+  const { email, name } = params;
+
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("id, email, name")
+    .eq("email", email)
+    .eq("name", name)
+    .single();
+
+  if (error || !user) {
+    return { ok: false as const, code: "USER_NOT_FOUND" as const };
+  }
+
+  const resetToken = generateResetToken();
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10분
+  resetSessionStore.set(resetToken, {
+    userId: user.id,
+    expiresAt,
+  });
+
+  return {
+    ok: true as const,
+    resetToken,
+    expiresIn: 600,
+  };
+}
+
+export async function confirmPasswordResetService(params: {
+  resetToken: string;
+  newPassword: string;
+}) {
+  const { resetToken, newPassword } = params;
+
+  const session = resetSessionStore.get(resetToken);
+  if (!session) {
+    return { ok: false as const, code: "INVALID_RESET_TOKEN" as const };
+  }
+
+  if (session.expiresAt < Date.now()) {
+    resetSessionStore.delete(resetToken);
+    return { ok: false as const, code: "RESET_TOKEN_EXPIRED" as const };
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  const { error } = await supabase
+    .from("users")
+    .update({ password_hash: passwordHash })
+    .eq("id", session.userId);
+  if (error) {
+    throw new Error(error.message);
+  }
+  // 1회용 토큰
+  resetSessionStore.delete(resetToken);
+  return { ok: true as const };
+}

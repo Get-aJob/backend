@@ -5,6 +5,8 @@ import {
   me,
   logout,
   refresh,
+  requestPasswordReset,
+  confirmPasswordReset,
 } from "../controllers/authController";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -229,5 +231,8 @@ router.post("/logout", logout);
  *                   example: TOKEN_REUSE_DETECTED
  */
 router.post("/refresh", refresh);
+
+router.post("/password/reset", requestPasswordReset);
+router.put("/password/reset", confirmPasswordReset);
 
 export default router;

@@ -3,6 +3,8 @@ import {
   registerUser,
   loginUser,
   rotateRefreshToken,
+  requestPasswordResetService,
+  confirmPasswordResetService,
 } from "../services/authService";
 import { accessCookieOptions, refreshCookieOptions } from "../config/auth";
 import { logger } from "../utils/logger";
@@ -111,4 +113,48 @@ export async function logout(req: Request, res: Response) {
 
   logger.info("유저 로그아웃");
   return res.status(200).json({ message: "로그아웃에 성공했습니다." });
+}
+export async function requestPasswordReset(req: Request, res: Response) {
+  const { email, name } = req.body ?? {};
+
+  if (!email || !name) {
+    return res.status(400).json({ error: "INVALID_INPUT" });
+  }
+
+  const result = await requestPasswordResetService({ email, name });
+
+  if (!result.ok) {
+    return res.status(404).json({ error: "USER_NOT_FOUND" });
+  }
+
+  logger.info("비밀번호 재설정 요청 성공", { email });
+  return res.status(200).json({
+    message: "사용자 확인 완료",
+    reset_token: result.resetToken,
+    expires_in: result.expiresIn,
+  });
+}
+
+export async function confirmPasswordReset(req: Request, res: Response) {
+  const { reset_token: resetToken, password: newPassword } = req.body ?? {};
+
+  if (!resetToken || !newPassword) {
+    return res.status(400).json({ error: "INVALID_INPUT" });
+  }
+
+  /*
+  if (String(newPassword).length < 8) {
+    return res.status(400).json({ error: "WEAK_PASSWORD" });
+  }
+  */
+
+  const result = await confirmPasswordResetService({ resetToken, newPassword });
+
+  if (!result.ok) {
+    return res.status(401).json({ error: result.code });
+  }
+
+  logger.info("비밀번호 재설정 완료");
+
+  return res.status(200).json({ message: "비밀번호가 변경되었습니다." });
 }
