@@ -1,5 +1,10 @@
 const { supabase } = require("../lib/supabase");
-import { ResumeContent, ResumeRecord, ResumeListItem } from "../types/resume";
+import {
+  ResumeContent,
+  ResumeRecord,
+  ResumeListItem,
+  ResumeListResponse,
+} from "../types/resume";
 
 // 이력서 생성
 
@@ -7,22 +12,26 @@ export async function createResume(
   userId: string,
   title: string,
   content: ResumeContent,
-): Promise<ResumeRecord> {
+): Promise<ResumeListResponse> {
   const { data, error } = await supabase
     .from("resumes")
     .insert({
       user_id: userId,
       title,
-      content,
+      content: JSON.stringify(content), // 객체를 문자열로 저장
     })
-    .select()
+    .select("id, title, created_at")
     .single();
 
   if (error) {
     throw new Error(`이력서 생성 실패: ${error.message}`);
   }
 
-  return data as ResumeRecord;
+  return {
+    id: data.id,
+    title: data.title,
+    createdAt: data.created_at,
+  };
 }
 
 // 사용자별 이력서 목록 조회
@@ -63,7 +72,14 @@ export async function getResumeById(
     throw new Error(`이력서 조회 실패: ${error.message}`);
   }
 
-  return data as ResumeRecord;
+  // content가 문자열(text)로 저장되어 있으므로 다시 객체로 변환
+  const content =
+    typeof data.content === "string" ? JSON.parse(data.content) : data.content;
+
+  return {
+    ...data,
+    content,
+  } as ResumeRecord;
 }
 
 // 이력서 수정
@@ -72,16 +88,19 @@ export async function updateResume(
   resumeId: string,
   userId: string,
   updates: { title?: string; content?: ResumeContent },
-): Promise<ResumeRecord | null> {
+): Promise<{ id: string; title: string; updated_at: string } | null> {
+  const body: any = { ...updates };
+  if (updates.content) {
+    body.content = JSON.stringify(updates.content);
+  }
+  body.updated_at = new Date().toISOString();
+
   const { data, error } = await supabase
     .from("resumes")
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .update(body)
     .eq("id", resumeId)
     .eq("user_id", userId)
-    .select()
+    .select("id, title, updated_at")
     .single();
 
   if (error) {
@@ -91,7 +110,7 @@ export async function updateResume(
     throw new Error(`이력서 수정 실패: ${error.message}`);
   }
 
-  return data as ResumeRecord;
+  return data;
 }
 
 // 이력서 삭제

@@ -18,15 +18,11 @@ export async function uploadResume(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const userId = (req as any).user?.id ?? "temp-user-id";
+    const userId = res.locals.user.id;
 
-    const record = await resumeService.createResume(userId, title, resume);
+    const response = await resumeService.createResume(userId, title, resume);
 
-    res.status(201).json({
-      id: record.id,
-      title: record.title,
-      createdAt: record.created_at,
-    });
+    res.status(201).json(response);
   } catch (err) {
     console.error("이력서 업로드 오류:", err);
     res.status(500).json({ error: "이력서 업로드에 실패했습니다." });
@@ -36,11 +32,11 @@ export async function uploadResume(req: Request, res: Response): Promise<void> {
 // 이력서 목록 조회
 export async function listResumes(req: Request, res: Response): Promise<void> {
   try {
-    const userId = (req as any).user?.id ?? "temp-user-id";
+    const userId = res.locals.user.id;
 
     const resumes = await resumeService.getResumesByUser(userId);
 
-    const result = resumes.map((r) => ({
+    const result: ResumeListResponse[] = resumes.map((r) => ({
       id: r.id,
       title: r.title,
       createdAt: r.created_at,
@@ -57,7 +53,7 @@ export async function listResumes(req: Request, res: Response): Promise<void> {
 export async function getResume(req: Request, res: Response): Promise<void> {
   try {
     const resumeId = req.params.resumeId as string;
-    const userId = (req as any).user?.id ?? "temp-user-id";
+    const userId = res.locals.user.id;
 
     const record = await resumeService.getResumeById(resumeId, userId);
 
@@ -66,12 +62,14 @@ export async function getResume(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    res.status(200).json({
+    const response: ResumeDetailResponse = {
       id: record.id,
       title: record.title,
       content: record.content,
       createdAt: record.created_at,
-    });
+    };
+
+    res.status(200).json(response);
   } catch (err) {
     console.error("이력서 상세 조회 오류:", err);
     res.status(500).json({ error: "이력서 조회에 실패했습니다." });
@@ -90,23 +88,27 @@ export async function updateResume(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const userId = (req as any).user?.id ?? "temp-user-id";
+    const userId = res.locals.user.id;
 
     const updates: { title?: string; content?: any } = {};
     if (title) updates.title = title;
     if (resume) updates.content = resume;
 
-    const record = await resumeService.updateResume(resumeId, userId, updates);
+    const response = await resumeService.updateResume(
+      resumeId,
+      userId,
+      updates,
+    );
 
-    if (!record) {
+    if (!response) {
       res.status(404).json({ error: "이력서를 찾을 수 없습니다." });
       return;
     }
 
     res.status(200).json({
-      id: record.id,
-      title: record.title,
-      updatedAt: record.updated_at,
+      id: response.id,
+      title: response.title,
+      updatedAt: response.updated_at,
     });
   } catch (err) {
     console.error("이력서 수정 오류:", err);
@@ -119,7 +121,7 @@ export async function updateResume(req: Request, res: Response): Promise<void> {
 export async function deleteResume(req: Request, res: Response): Promise<void> {
   try {
     const resumeId = req.params.resumeId as string;
-    const userId = (req as any).user?.id ?? "temp-user-id";
+    const userId = res.locals.user.id;
 
     const deleted = await resumeService.deleteResume(resumeId, userId);
 

@@ -1,13 +1,21 @@
 // 이력서 관련 타입 정의
 
+export type AdditionalInfoType = "수상" | "자격증" | "활동" | undefined;
+export type LanguageLevelType =
+  | "유창함"
+  | "고급 비즈니스 레벨"
+  | "비즈니스 레벨"
+  | "일상 회화"
+  | undefined;
+
 // 근무 기간
 export interface Period {
-  startDate: string;
-  endDate: string;
+  startDate: string | null; // 프론트의 Date | null을 문자열(ISO)로 처리
+  endDate: string | null;
 }
 
-// 경력
-export interface WorkHistory {
+// 경력 (및 기타 경험)
+export interface Experience {
   companyName: string;
   position: string;
   period: Period;
@@ -18,26 +26,28 @@ export interface WorkHistory {
 export interface Education {
   name: string;
   period: Period;
+  description: string; // 추가됨
 }
 
 // 기타 활동
 export interface AdditionalInfo {
   name: string;
-  date: string;
-  type: string; // "수상" | "자격증" | "활동"
+  date: string | null; // 프론트의 Date | null을 문자열로 처리
+  type: AdditionalInfoType; // 타입 변경
   description: string;
 }
 
 // 어학 시험
 export interface LanguageTest {
   testName: string;
-  date: string;
+  date: string | null;
+  score: string; // 추가됨
 }
 
 // 어학 능력
 export interface Language {
   name: string;
-  level: string;
+  level: LanguageLevelType; // 타입 변경
   test: LanguageTest[];
 }
 
@@ -47,12 +57,12 @@ export interface Portfolio {
   url: string;
 }
 
-// 이력서
+// 이력서 내부 데이터 구조
 export interface ResumeContent {
   profile: string;
-  workHistory: WorkHistory[];
+  experience: Experience[]; // 위에서 experience로 가기로 했으므로 유지 (프론트에서도 이 이름으로 맞춰주시면 좋습니다)
   education: Education[];
-  skill: string[];
+  skill: string; // string[] -> string으로 변경
   additionalInfo: AdditionalInfo[];
   language: Language[];
   portfolio: Portfolio[];
