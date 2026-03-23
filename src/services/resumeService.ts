@@ -6,8 +6,6 @@ import {
   ResumeListResponse,
 } from "../types/resume";
 
-// 이력서 생성
-
 export async function createResume(
   userId: string,
   title: string,
@@ -33,8 +31,6 @@ export async function createResume(
     createdAt: data.created_at,
   };
 }
-
-// 사용자별 이력서 목록 조회
 
 export async function getResumesByUser(
   userId: string,
@@ -82,17 +78,27 @@ export async function getResumeById(
   } as ResumeRecord;
 }
 
-// 이력서 수정
-
 export async function updateResume(
   resumeId: string,
   userId: string,
-  updates: { title?: string; content?: ResumeContent },
+  updates: { title?: string; content?: Partial<ResumeContent> },
 ): Promise<{ id: string; title: string; updated_at: string } | null> {
-  const body: any = { ...updates };
+  const body: any = {};
+  if (updates.title) body.title = updates.title;
+
   if (updates.content) {
-    body.content = JSON.stringify(updates.content);
+    const currentRecord = await getResumeById(resumeId, userId);
+    if (!currentRecord) {
+      return null;
+    }
+
+    const mergedContent = {
+      ...currentRecord.content,
+      ...updates.content,
+    };
+    body.content = JSON.stringify(mergedContent);
   }
+
   body.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
@@ -113,7 +119,6 @@ export async function updateResume(
   return data;
 }
 
-// 이력서 삭제
 export async function deleteResume(
   resumeId: string,
   userId: string,

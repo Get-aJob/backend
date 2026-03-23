@@ -55,7 +55,8 @@ export interface Language {
 export interface Portfolio {
   name: string;
   url?: string;
-  file: File | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
 }
 
 // 이력서 내부 데이터 구조
