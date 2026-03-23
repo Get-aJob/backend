@@ -1,12 +1,12 @@
 // 이력서 관련 타입 정의
 
-export type AdditionalInfoType = "수상" | "자격증" | "활동" | undefined;
+export type AdditionalInfoType = "수상" | "자격증" | "활동" | null;
 export type LanguageLevelType =
   | "유창함"
   | "고급 비즈니스 레벨"
   | "비즈니스 레벨"
   | "일상 회화"
-  | undefined;
+  | null;
 
 // 근무 기간
 export interface Period {
@@ -55,7 +55,6 @@ export interface Language {
 export interface Portfolio {
   name: string;
   url?: string;
-  fileName?: string | null;
   fileUrl?: string | null;
 }
 

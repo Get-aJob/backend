@@ -83,15 +83,16 @@ export async function updateResume(
   userId: string,
   updates: { title?: string; content?: Partial<ResumeContent> },
 ): Promise<{ id: string; title: string; updated_at: string } | null> {
+  // 기존 데이터를 항상 가져옴 (Partial Update 머지 및 낙관적 잠금을 위해)
+  const currentRecord = await getResumeById(resumeId, userId);
+  if (!currentRecord) {
+    return null;
+  }
+
   const body: any = {};
   if (updates.title) body.title = updates.title;
 
   if (updates.content) {
-    const currentRecord = await getResumeById(resumeId, userId);
-    if (!currentRecord) {
-      return null;
-    }
-
     const mergedContent = {
       ...currentRecord.content,
       ...updates.content,
@@ -106,12 +107,16 @@ export async function updateResume(
     .update(body)
     .eq("id", resumeId)
     .eq("user_id", userId)
+    .eq("updated_at", currentRecord.updated_at) // 낙관적 잠금 (Optimistic Locking)
     .select("id, title, updated_at")
     .single();
 
   if (error) {
     if (error.code === "PGRST116") {
-      return null;
+      // 조건에 맞는 행이 없거나(ID 불일치) 그 사이 updated_at이 변한 경우
+      throw new Error(
+        "이력서 수정에 실패했습니다. 다른 곳에서 데이터가 이미 수정되었을 수 있습니다.",
+      );
     }
     throw new Error(`이력서 수정 실패: ${error.message}`);
   }
