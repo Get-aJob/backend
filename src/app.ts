@@ -10,6 +10,7 @@ import errorRouter from "./routes/error";
 import resumeRoutes from "./routes/resumeRoutes";
 import authRouter from "./routes/auth";
 import applicationRouter from "./routes/applicationsRoutes";
+import schedulesRouter from "./routes/schedulesRoutes";
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use("/auth", authRouter);
 app.use("/users", usersRouter);
 app.use("/api/resumes", resumeRoutes);
 app.use("/applications", applicationRouter);
+app.use("/schedules", schedulesRouter);
 
 app.use(errorRouter);
 
