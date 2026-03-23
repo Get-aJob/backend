@@ -5,6 +5,7 @@ import {
   ResumeListItem,
   ResumeListResponse,
 } from "../types/resume";
+import { ConflictError, NotFoundError } from "../utils/errors";
 
 export async function createResume(
   userId: string,
@@ -86,7 +87,7 @@ export async function updateResume(
   // 기존 데이터를 항상 가져옴 (Partial Update 머지 및 낙관적 잠금을 위해)
   const currentRecord = await getResumeById(resumeId, userId);
   if (!currentRecord) {
-    return null;
+    throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
   }
 
   const body: any = {};
@@ -114,8 +115,8 @@ export async function updateResume(
   if (error) {
     if (error.code === "PGRST116") {
       // 조건에 맞는 행이 없거나(ID 불일치) 그 사이 updated_at이 변한 경우
-      throw new Error(
-        "이력서 수정에 실패했습니다. 다른 곳에서 데이터가 이미 수정되었을 수 있습니다.",
+      throw new ConflictError(
+        "이미 다른 기기나 탭에서 수정된 내용이 있습니다. 페이지를 새로고침 해주세요.",
       );
     }
     throw new Error(`이력서 수정 실패: ${error.message}`);

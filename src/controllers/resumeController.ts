@@ -7,6 +7,7 @@ import {
   ResumeDetailResponse,
   ResumeUpdateResponse,
 } from "../types/resume";
+import { ConflictError, NotFoundError } from "../utils/errors";
 
 // 이력서 업로드 (생성)
 export async function uploadResume(req: Request, res: Response): Promise<void> {
@@ -111,6 +112,15 @@ export async function updateResume(req: Request, res: Response): Promise<void> {
       updatedAt: response.updated_at,
     });
   } catch (err) {
+    if (err instanceof ConflictError) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
+    if (err instanceof NotFoundError) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+
     console.error("이력서 수정 오류:", err);
     res.status(500).json({ error: "이력서 수정에 실패했습니다." });
   }
