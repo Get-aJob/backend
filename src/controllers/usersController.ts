@@ -51,6 +51,7 @@ export async function withdrawUser(req: Request, res: Response) {
  */
 export async function uploadMyProfileImage(req: Request, res: Response) {
   const user = res.locals.user as { id: string; email: string } | undefined;
+
   if (!user?.id) return res.status(401).json({ error: "UNAUTHORIZED" });
 
   const file = req.file;
@@ -71,12 +72,10 @@ export async function uploadMyProfileImage(req: Request, res: Response) {
       contentType: file.mimetype,
     });
 
-    return res
-      .status(200)
-      .json({
-        message: "프로필 이미지가 반영되었습니다.",
-        profileImageUrl: result.profileImageUrl,
-      });
+    return res.status(200).json({
+      message: "프로필 이미지가 반영되었습니다.",
+      profileImageUrl: result.profileImageUrl,
+    });
   } catch (e) {
     logger.error("프로필 이미지 업로드 요청 실패", {
       userId: user.id,
@@ -93,16 +92,21 @@ export async function uploadMyProfileImage(req: Request, res: Response) {
  */
 export async function deleteMyProfileImage(req: Request, res: Response) {
   const user = res.locals.user as { id: string; email: string } | undefined;
+
   if (!user?.id) return res.status(401).json({ error: "UNAUTHORIZED" });
+
   try {
     logger.info("프로필 이미지 삭제 요청", { userId: user.id });
+
     await deleteProfileImage({ userId: user.id });
+
     return res.status(200).json({ message: "프로필 이미지를 삭제했습니다." });
   } catch (e) {
     logger.error("프로필 이미지 삭제 요청 실패", {
       userId: user.id,
       error: e instanceof Error ? e.message : String(e),
     });
+
     return res.status(500).json({ error: "PROFILE_IMAGE_DELETE_FAILED" });
   }
 }
