@@ -16,7 +16,7 @@ export async function listSchedules(req: Request, res: Response) {
   try {
     const startDate = getSingleQueryString(req.query.startDate);
     const endDate = getSingleQueryString(req.query.endDate);
-    const rawAppliedYN = getSingleQueryString(req.query.appliedYN ?? req.query.appliedYn);
+    const rawIsApplied = getSingleQueryString(req.query.isApplied);
 
     if ((startDate && !endDate) || (!startDate && endDate)) {
       return res.status(400).json({ error: "startDate와 endDate는 함께 전달해야 합니다." });
@@ -34,23 +34,23 @@ export async function listSchedules(req: Request, res: Response) {
       return res.status(400).json({ error: "startDate는 endDate보다 클 수 없습니다." });
     }
 
-    let appliedYN: "Y" | "N" | undefined;
-    if (rawAppliedYN !== undefined) {
-      const normalized = rawAppliedYN.trim().toUpperCase();
-      if (normalized !== "Y" && normalized !== "N") {
-        return res.status(400).json({ error: "appliedYN/appliedYn은 Y 또는 N만 허용됩니다." });
+    let isApplied: boolean | undefined;
+    if (rawIsApplied !== undefined) {
+      const normalized = rawIsApplied.trim().toLowerCase();
+      if (normalized !== "true" && normalized !== "false") {
+        return res.status(400).json({ error: "isApplied는 true 또는 false만 허용됩니다." });
       }
-      appliedYN = normalized;
+      isApplied = normalized === "true";
     }
 
     const userId = res.locals.user?.id as string | undefined;
-    if (appliedYN && !userId) {
-      return res.status(400).json({ error: "appliedYN/appliedYn은 로그인 사용자만 사용할 수 있습니다." });
+    if (isApplied && !userId) {
+      return res.status(400).json({ error: "isApplied는 로그인 사용자만 사용할 수 있습니다." });
     }
     const schedules = await getSchedules({
       startDate,
       endDate,
-      appliedYN,
+      isApplied,
       userId,
     });
 

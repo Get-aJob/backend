@@ -7,7 +7,7 @@ const APPLICATION_TABLE_NAME = "applications";
 type GetSchedulesParams = {
     startDate?: string;
     endDate?: string;
-    appliedYN?: "Y" | "N";
+    isApplied?: boolean;
     userId?: string;
 };
 
@@ -29,18 +29,62 @@ function cleanCompanyName(name: string) {
 }
 
 export async function getSchedules(params: GetSchedulesParams) {
-    const { startDate, endDate, appliedYN, userId } = params;
+    const { startDate, endDate, isApplied, userId } = params;
+
+    const startDateTime = startDate ? `${startDate}T00:00:00Z` : undefined;
+    const endDateTimeExclusive = endDate
+        ? new Date(new Date(`${endDate}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000).toISOString()
+        : undefined;
+
+    if (isApplied === true && userId) {
+        let applicationsQuery = supabase
+            .from(APPLICATION_TABLE_NAME)
+            .select("job_posting_id, applied_at, job_postings(id, title, company_name)")
+            .eq("user_id", userId)
+            .order("applied_at", { ascending: true });
+
+        if (startDateTime) {
+            applicationsQuery = applicationsQuery.gte("applied_at", startDateTime);
+        }
+
+        if (endDateTimeExclusive) {
+            applicationsQuery = applicationsQuery.lt("applied_at", endDateTimeExclusive);
+        }
+
+        const { data: applications, error: applicationsError } = await applicationsQuery;
+        if (applicationsError) {
+            throw withCode(applicationsError);
+        }
+
+        const safeApplications = convertKeysToCamel<any[]>(applications ?? []);
+        const events = safeApplications
+            .filter((application: any) => !!application.jobPostings)
+            .map((application: any) => ({
+                jobPostingId: application.jobPostingId,
+                type: "job_post",
+                eventType: "applied",
+                title: application.jobPostings.title,
+                company: cleanCompanyName(application.jobPostings.companyName),
+                date: application.appliedAt?.split("T")[0],
+                isApplied: true,
+            }));
+
+        return {
+            events,
+        };
+    }
 
     let query = supabase
         .from(POSTING_TABLE_NAME)
-        .select("id, company_name, title, deadline, source_type, created_by")
-        if (startDate) {
+        .select("id, company_name, title, deadline, source_type, created_by");
+
+    if (startDate) {
         query = query.gte("deadline", startDate);
-        }
-        if (endDate) {
-            query = query.lte("deadline", endDate);
-        }
-        query = query.order("deadline", { ascending: true });
+    }
+    if (endDate) {
+        query = query.lte("deadline", endDate);
+    }
+    query = query.order("deadline", { ascending: true });
 
     const { data: postings, error: postingsError } = await query;
     if (postingsError) {
@@ -49,10 +93,9 @@ export async function getSchedules(params: GetSchedulesParams) {
 
     const safePostings = convertKeysToCamel<any[]>(postings ?? []);
 
-    // 🔹 지원 여부 조회
     let appliedPostingIdSet = new Set<string>();
 
-    if (appliedYN === "Y" && userId) {
+    if (userId) {
         const { data: userApplications, error: applicationsError } = await supabase
             .from(APPLICATION_TABLE_NAME)
             .select("job_posting_id")
@@ -69,12 +112,8 @@ export async function getSchedules(params: GetSchedulesParams) {
         );
     }
 
-    //  일정 이벤트 생성
     const events = safePostings
         .filter((posting: any) => {
-            if (appliedYN === "Y") {
-                return appliedPostingIdSet.has(posting.id);
-            }
 
             if (posting.sourceType === "auto") {
                 return true;
@@ -86,13 +125,13 @@ export async function getSchedules(params: GetSchedulesParams) {
             const isApplied = appliedPostingIdSet.has(posting.id);
 
             return {
-                id: posting.id,
+                jobPostingId: posting.id,
                 type: "job_post",
                 eventType: "deadline",
                 title: posting.title,
                 company: cleanCompanyName(posting.companyName),
                 date: posting.deadline?.split("T")[0], // yyyy-mm-dd
-                appliedYN: isApplied ? "Y" : "N",
+                isApplied,
             };
         });
 
