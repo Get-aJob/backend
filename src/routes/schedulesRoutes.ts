@@ -59,7 +59,7 @@ const router = Router();
  *                             description: deadline=공고 마감일 기준, applied=지원일 기준
  *                           title:
  *                             type: string
- *                           company:
+ *                           companyName:
  *                             type: string
  *                           date:
  *                             type: string

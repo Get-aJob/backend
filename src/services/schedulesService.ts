@@ -39,7 +39,7 @@ export async function getSchedules(params: GetSchedulesParams) {
     if (isApplied === true && userId) {
         let applicationsQuery = supabase
             .from(APPLICATION_TABLE_NAME)
-            .select("job_posting_id, applied_at, job_postings(id, title, company_name)")
+            .select("job_posting_id, applied_at, job_postings(id, title, company_name, deadline)")
             .eq("user_id", userId)
             .order("applied_at", { ascending: true });
 
@@ -59,15 +59,43 @@ export async function getSchedules(params: GetSchedulesParams) {
         const safeApplications = convertKeysToCamel<any[]>(applications ?? []);
         const events = safeApplications
             .filter((application: any) => !!application.jobPostings)
-            .map((application: any) => ({
-                jobPostingId: application.jobPostingId,
-                type: "job_post",
-                eventType: "applied",
-                title: application.jobPostings.title,
-                company: cleanCompanyName(application.jobPostings.companyName),
-                date: application.appliedAt?.split("T")[0],
-                isApplied: true,
-            }));
+            .flatMap((application: any) => {
+                const postingId = application.jobPostingId;
+                const title = application.jobPostings.title;
+                const companyName = cleanCompanyName(application.jobPostings.companyName);
+                const deadline = application.jobPostings.deadline;
+                const appliedAt = application.appliedAt;
+
+                const eventArray = [];
+
+                // 마감일 이벤트
+                if (deadline) {
+                    eventArray.push({
+                        jobPostingId: postingId,
+                        type: "job_post",
+                        eventType: "deadline",
+                        title,
+                        companyName,
+                        date: deadline.split("T")[0],
+                        isApplied: true,
+                    });
+                }
+
+                // 지원일 이벤트
+                if (appliedAt) {
+                    eventArray.push({
+                        jobPostingId: postingId,
+                        type: "job_post",
+                        eventType: "applied",
+                        title,
+                        companyName,
+                        date: appliedAt.split("T")[0],
+                        isApplied: true,
+                    });
+                }
+
+                return eventArray;
+            });
 
         return {
             events,
