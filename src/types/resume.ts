@@ -16,7 +16,7 @@ export interface Period {
 
 // 경력 (및 기타 경험)
 export interface Experience {
-  companyName: string;
+  name: string;
   position: string;
   period: Period;
   description: string;
@@ -26,7 +26,7 @@ export interface Experience {
 export interface Education {
   name: string;
   period: Period;
-  description: string; // 추가됨
+  description: string;
 }
 
 // 기타 활동
@@ -54,7 +54,8 @@ export interface Language {
 // 포트폴리오 링크
 export interface Portfolio {
   name: string;
-  url: string;
+  url?: string;
+  file: File | null;
 }
 
 // 이력서 내부 데이터 구조
