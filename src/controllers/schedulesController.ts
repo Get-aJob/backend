@@ -2,14 +2,21 @@ import { Request, Response } from "express";
 import { getSchedules } from "../services/schedulesService";
 
 function isIsoDateOnly(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
+function getSingleQueryString(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  return undefined;
 }
 
 export async function listSchedules(req: Request, res: Response) {
   try {
-    const startDate = req.query.startDate as string | undefined;
-    const endDate = req.query.endDate as string | undefined;
-    const rawAppliedYN = (req.query.appliedYN ?? req.query.appliedYn) as string | undefined;
+    const startDate = getSingleQueryString(req.query.startDate);
+    const endDate = getSingleQueryString(req.query.endDate);
+    const rawAppliedYN = getSingleQueryString(req.query.appliedYN ?? req.query.appliedYn);
 
     if ((startDate && !endDate) || (!startDate && endDate)) {
       return res.status(400).json({ error: "startDate와 endDate는 함께 전달해야 합니다." });
@@ -37,6 +44,9 @@ export async function listSchedules(req: Request, res: Response) {
     }
 
     const userId = res.locals.user?.id as string | undefined;
+    if (appliedYN && !userId) {
+      return res.status(400).json({ error: "appliedYN/appliedYn은 로그인 사용자만 사용할 수 있습니다." });
+    }
     const schedules = await getSchedules({
       startDate,
       endDate,

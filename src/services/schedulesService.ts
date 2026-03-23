@@ -34,9 +34,13 @@ export async function getSchedules(params: GetSchedulesParams) {
     let query = supabase
         .from(POSTING_TABLE_NAME)
         .select("id, company_name, title, deadline, source_type, created_by")
-        .gte("deadline", startDate)
-        .lte("deadline", endDate)
-        .order("deadline", { ascending: true });
+        if (startDate) {
+        query = query.gte("deadline", startDate);
+        }
+        if (endDate) {
+            query = query.lte("deadline", endDate);
+        }
+        query = query.order("deadline", { ascending: true });
 
     const { data: postings, error: postingsError } = await query;
     if (postingsError) {
