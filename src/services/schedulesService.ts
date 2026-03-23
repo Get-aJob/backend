@@ -157,7 +157,7 @@ export async function getSchedules(params: GetSchedulesParams) {
                 type: "job_post",
                 eventType: "deadline",
                 title: posting.title,
-                company: cleanCompanyName(posting.companyName),
+                companyName: cleanCompanyName(posting.companyName),
                 date: posting.deadline?.split("T")[0], // yyyy-mm-dd
                 isApplied,
             };
