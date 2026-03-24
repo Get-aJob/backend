@@ -32,9 +32,7 @@ export async function getSchedules(params: GetSchedulesParams) {
     const { startDate, endDate, isApplied, userId } = params;
 
     const startDateTime = startDate ? `${startDate}T00:00:00Z` : undefined;
-    const endDateTimeExclusive = endDate
-        ? new Date(new Date(`${endDate}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000).toISOString()
-        : undefined;
+    const endDateTime = endDate ? `${endDate}T00:00:00Z` : undefined;
 
     if (isApplied === true && userId) {
         let applicationsQuery = supabase
@@ -47,8 +45,8 @@ export async function getSchedules(params: GetSchedulesParams) {
             applicationsQuery = applicationsQuery.gte("applied_at", startDateTime);
         }
 
-        if (endDateTimeExclusive) {
-            applicationsQuery = applicationsQuery.lt("applied_at", endDateTimeExclusive);
+        if (endDateTime) {
+            applicationsQuery = applicationsQuery.lte("applied_at", endDateTime);
         }
 
         const { data: applications, error: applicationsError } = await applicationsQuery;
