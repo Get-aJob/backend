@@ -31,7 +31,7 @@ app.use("/api", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/", indexRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);
-app.use("/api/resumes", resumeRoutes);
+app.use("/resumes", resumeRoutes);
 app.use("/applications", applicationRouter);
 
 app.use(errorRouter);

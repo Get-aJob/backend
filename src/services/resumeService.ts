@@ -1,31 +1,37 @@
 const { supabase } = require("../lib/supabase");
-import { ResumeContent, ResumeRecord, ResumeListItem } from "../types/resume";
-
-// 이력서 생성
+import {
+  ResumeContent,
+  ResumeRecord,
+  ResumeListItem,
+  ResumeListResponse,
+} from "../types/resume";
+import { ConflictError, NotFoundError } from "../utils/errors";
 
 export async function createResume(
   userId: string,
   title: string,
   content: ResumeContent,
-): Promise<ResumeRecord> {
+): Promise<ResumeListResponse> {
   const { data, error } = await supabase
     .from("resumes")
     .insert({
       user_id: userId,
       title,
-      content,
+      content: JSON.stringify(content), // 객체를 문자열로 저장
     })
-    .select()
+    .select("id, title, created_at")
     .single();
 
   if (error) {
     throw new Error(`이력서 생성 실패: ${error.message}`);
   }
 
-  return data as ResumeRecord;
+  return {
+    id: data.id,
+    title: data.title,
+    createdAt: data.created_at,
+  };
 }
-
-// 사용자별 이력서 목록 조회
 
 export async function getResumesByUser(
   userId: string,
@@ -63,38 +69,62 @@ export async function getResumeById(
     throw new Error(`이력서 조회 실패: ${error.message}`);
   }
 
-  return data as ResumeRecord;
-}
+  // content가 문자열(text)로 저장되어 있으므로 다시 객체로 변환
+  const content =
+    typeof data.content === "string" ? JSON.parse(data.content) : data.content;
 
-// 이력서 수정
+  return {
+    ...data,
+    content,
+  } as ResumeRecord;
+}
 
 export async function updateResume(
   resumeId: string,
   userId: string,
-  updates: { title?: string; content?: ResumeContent },
-): Promise<ResumeRecord | null> {
+  updates: { title?: string; content?: Partial<ResumeContent> },
+): Promise<{ id: string; title: string; updated_at: string } | null> {
+  // 기존 데이터를 항상 가져옴 (Partial Update 머지 및 낙관적 잠금을 위해)
+  const currentRecord = await getResumeById(resumeId, userId);
+  if (!currentRecord) {
+    throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
+  }
+
+  const body: any = {};
+  if (updates.title) body.title = updates.title;
+
+  if (updates.content) {
+    const mergedContent = {
+      ...currentRecord.content,
+      ...updates.content,
+    };
+    body.content = JSON.stringify(mergedContent);
+  }
+
+  body.updated_at = new Date().toISOString();
+
   const { data, error } = await supabase
     .from("resumes")
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .update(body)
     .eq("id", resumeId)
     .eq("user_id", userId)
-    .select()
+    .eq("updated_at", currentRecord.updated_at) // 낙관적 잠금 (Optimistic Locking)
+    .select("id, title, updated_at")
     .single();
 
   if (error) {
     if (error.code === "PGRST116") {
-      return null;
+      // 조건에 맞는 행이 없거나(ID 불일치) 그 사이 updated_at이 변한 경우
+      throw new ConflictError(
+        "이미 다른 기기나 탭에서 수정된 내용이 있습니다. 페이지를 새로고침 해주세요.",
+      );
     }
     throw new Error(`이력서 수정 실패: ${error.message}`);
   }
 
-  return data as ResumeRecord;
+  return data;
 }
 
-// 이력서 삭제
 export async function deleteResume(
   resumeId: string,
   userId: string,
