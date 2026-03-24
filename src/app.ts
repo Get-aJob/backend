@@ -11,6 +11,7 @@ import resumeRoutes from "./routes/resumeRoutes";
 import authRouter from "./routes/auth";
 import applicationRouter from "./routes/applicationsRoutes";
 import schedulesRouter from "./routes/schedulesRoutes";
+import scrapsRouter from "./routes/scrapsRoutes";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/users", usersRouter);
 app.use("/resumes", resumeRoutes);
 app.use("/applications", applicationRouter);
 app.use("/schedules", schedulesRouter);
+app.use("/scraps", scrapsRouter);
 
 app.use(errorRouter);
 
