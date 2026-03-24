@@ -2,6 +2,12 @@ import {supabase} from "../lib/supabase";
 
 const TABLE_NAME = 'user_interested_jobs';
 
+function throwSupabaseError(error: { message: string; code?: string }): never {
+    const e = new Error(error.message) as Error & { code?: string };
+    e.code = error.code;
+    throw e;
+}
+
 export async function toggleScrap(userId : string, jobPostingId : string) {
     // 먼저 이미 스크랩되어 있는지 확인
     const { data: existing, error: checkError } = await supabase
@@ -12,9 +18,7 @@ export async function toggleScrap(userId : string, jobPostingId : string) {
         .maybeSingle();
 
     if (checkError) {
-        const e = new Error(checkError.message) as Error & { code?: string }
-        e.code = checkError.code
-        throw e
+        throwSupabaseError(checkError);
     }
 
     // 이미 스크랩되어 있으면 삭제
@@ -25,9 +29,7 @@ export async function toggleScrap(userId : string, jobPostingId : string) {
             .eq('id', existing.id);
 
         if (deleteError) {
-            const e = new Error(deleteError.message) as Error & { code?: string }
-            e.code = deleteError.code
-            throw e
+            throwSupabaseError(deleteError);
         }
 
         return { added: false };
@@ -39,9 +41,7 @@ export async function toggleScrap(userId : string, jobPostingId : string) {
         .insert([{ user_id: userId, job_posting_id: jobPostingId }]);
 
     if (insertError) {
-        const e = new Error(insertError.message) as Error & { code?: string }
-        e.code = insertError.code
-        throw e
+        throwSupabaseError(insertError);
     }
 
     return { added: true };

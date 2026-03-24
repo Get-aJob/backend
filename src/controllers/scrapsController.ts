@@ -12,21 +12,14 @@ type AuthRequest = Request & {
     user ? : AuthUser;
 }
 
-type AuthLocals = {
-    user ? : {
-        id?: string;
-        email?: string;
-    }
-}
-
 export async function toggleScrapHandler(req: AuthRequest, res: Response) {
     try {
         const userId = res.locals.user?.id || req.user?.id;
         if (!userId) {
             return res.status(400).json({ error: '유효한 사용자 정보가 없습니다.' });
         }
-        const jobPostingId = String(req.params.jobPostingId);
-        if (!jobPostingId) {
+        const jobPostingId = req.params.jobPostingId;
+        if (!jobPostingId || typeof jobPostingId !== 'string') {
             return res.status(400).json({ error: '유효한 공고 ID가 없습니다.' });
         }
         const result = await toggleScrap(userId, jobPostingId);
