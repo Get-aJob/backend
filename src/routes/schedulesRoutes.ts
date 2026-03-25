@@ -61,6 +61,14 @@ const router = Router();
  *                             type: string
  *                           companyName:
  *                             type: string
+ *                           sourceType:
+ *                             type: string
+ *                             description: 공고 수집 출처 유형
+ *                             example: auto
+ *                           companyLogo:
+ *                             type: string
+ *                             description: 회사 로고 URL. 값이 없으면 빈 문자열
+ *                             example: https://example.com/company-logo.png
  *                           date:
  *                             type: string
  *                             example: 2026-03-31
