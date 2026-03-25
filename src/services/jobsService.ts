@@ -26,13 +26,15 @@ export async function crawlAndSaveJob(url: string, userId: string) {
       : responseData as CrawledJob;
 
     // deadline 처리: timestamp 형식이 아니면 deadline_text에 저장
-    const rawDeadline = crawledData.deadline || null;
+    const rawDeadline = String(crawledData.deadline || "").trim();
     let deadline = null;
     let deadlineText = null;
 
     if (rawDeadline) {
-      if (!isNaN(Date.parse(rawDeadline))) {
-        deadline = rawDeadline;
+      const parsedDate = new Date(rawDeadline);
+      // 1. 숫자가 포함되어 있고 2. Date 객체로 변환 가능하며 3. 너무 짧지 않은 경우에만 날짜로 간주
+      if (!isNaN(parsedDate.getTime()) && /\d/.test(rawDeadline) && rawDeadline.length > 5) {
+        deadline = parsedDate.toISOString();
       } else {
         deadlineText = rawDeadline;
       }
