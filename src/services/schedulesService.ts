@@ -37,7 +37,7 @@ export async function getSchedules(params: GetSchedulesParams) {
     if (isApplied === true && userId) {
         let applicationsQuery = supabase
             .from(APPLICATION_TABLE_NAME)
-            .select("job_posting_id, applied_at, job_postings(id, title, company_name, deadline)")
+            .select("job_posting_id, applied_at, job_postings(id, title, company_name, deadline, source_type, company_logo)")
             .eq("user_id", userId)
             .order("applied_at", { ascending: true });
 
@@ -63,6 +63,8 @@ export async function getSchedules(params: GetSchedulesParams) {
                 const companyName = cleanCompanyName(application.jobPostings.companyName);
                 const deadline = application.jobPostings.deadline;
                 const appliedAt = application.appliedAt;
+                const sourceType = application.jobPostings.sourceType;
+                const companyLogo = application.jobPostings.companyLogo ?? "";
 
                 const eventArray = [];
 
@@ -76,6 +78,8 @@ export async function getSchedules(params: GetSchedulesParams) {
                         companyName,
                         date: deadline.split("T")[0],
                         isApplied: true,
+                        sourceType,
+                        companyLogo,
                     });
                 }
 
@@ -89,6 +93,8 @@ export async function getSchedules(params: GetSchedulesParams) {
                         companyName,
                         date: appliedAt.split("T")[0],
                         isApplied: true,
+                        sourceType,
+                        companyLogo,
                     });
                 }
 
@@ -102,7 +108,7 @@ export async function getSchedules(params: GetSchedulesParams) {
 
     let query = supabase
         .from(POSTING_TABLE_NAME)
-        .select("id, company_name, title, deadline, source_type, created_by");
+        .select("id, company_name, title, deadline, source_type, created_by, company_logo");
 
     if (startDate) {
         query = query.gte("deadline", startDate);
@@ -158,6 +164,8 @@ export async function getSchedules(params: GetSchedulesParams) {
                 companyName: cleanCompanyName(posting.companyName),
                 date: posting.deadline?.split("T")[0], // yyyy-mm-dd
                 isApplied,
+                sourceType: posting.sourceType,
+                companyLogo: posting.companyLogo ?? "",
             };
         });
 
