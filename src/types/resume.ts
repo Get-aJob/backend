@@ -8,13 +8,11 @@ export type LanguageLevelType =
   | "일상 회화"
   | null;
 
-// 근무 기간
 export interface Period {
-  startDate: string | null; // 프론트의 Date | null을 문자열(ISO)로 처리
+  startDate: string | null;
   endDate: string | null;
 }
 
-// 경력 (및 기타 경험)
 export interface Experience {
   name: string;
   position: string;
@@ -22,54 +20,47 @@ export interface Experience {
   description: string;
 }
 
-// 학력
 export interface Education {
   name: string;
   period: Period;
   description: string;
 }
 
-// 기타 활동
 export interface AdditionalInfo {
   name: string;
-  date: string | null; // 프론트의 Date | null을 문자열로 처리
-  type: AdditionalInfoType; // 타입 변경
+  date: string | null;
+  type: AdditionalInfoType;
   description: string;
 }
 
-// 어학 시험
 export interface LanguageTest {
   testName: string;
   date: string | null;
-  score: string; // 추가됨
+  score: string;
 }
 
-// 어학 능력
 export interface Language {
   name: string;
-  level: LanguageLevelType; // 타입 변경
+  level: LanguageLevelType;
   test: LanguageTest[];
 }
 
-// 포트폴리오 링크
 export interface Portfolio {
   name: string;
   url?: string;
   fileUrl?: string | null;
 }
 
-// 이력서 내부 데이터 구조
 export interface ResumeContent {
   profile: string;
-  experience: Experience[]; // 위에서 experience로 가기로 했으므로 유지 (프론트에서도 이 이름으로 맞춰주시면 좋습니다)
+  experience: Experience[];
   education: Education[];
-  skill: string; // string[] -> string으로 변경
+  skill: string;
   additionalInfo: AdditionalInfo[];
   language: Language[];
   portfolio: Portfolio[];
 }
 
-// DB에 저장되는 이력서 레코드
 export interface ResumeRecord {
   id: string;
   user_id: string;
@@ -79,32 +70,27 @@ export interface ResumeRecord {
   updated_at: string;
 }
 
-// 이력서 목록 조회를 위한 경량화된 타입
 export type ResumeListItem = Pick<
   ResumeRecord,
   "id" | "title" | "created_at" | "updated_at"
 >;
 
-// 이력서 생성 요청 바디
 export interface CreateResumeBody {
   title: string;
   resume: ResumeContent;
 }
 
-// 이력서 수정 요청 바디
 export interface UpdateResumeBody {
   title?: string;
   resume?: Partial<ResumeContent>;
 }
 
-// 이력서 목록 응답 (목록 조회, 업로드 시 사용)
 export interface ResumeListResponse {
   id: string;
   title: string;
   createdAt: string;
 }
 
-// 이력서 상세 응답 (상세 조회 시 사용)
 export interface ResumeDetailResponse {
   id: string;
   title: string;
@@ -112,7 +98,6 @@ export interface ResumeDetailResponse {
   createdAt: string;
 }
 
-// 이력서 수정 응답
 export interface ResumeUpdateResponse {
   id: string;
   title: string;
