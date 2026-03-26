@@ -6,6 +6,7 @@ import {
   ResumeListResponse,
 } from "../types/resume";
 import { ConflictError, NotFoundError } from "../utils/errors";
+import { deletePortfolioFilesFromUrls } from "./portfolioService";
 
 export async function createResume(
   userId: string,
@@ -49,8 +50,6 @@ export async function getResumesByUser(
   return (data ?? []) as ResumeListItem[];
 }
 
-//이력서 상세 조회
-
 export async function getResumeById(
   resumeId: string,
   userId: string,
@@ -69,7 +68,6 @@ export async function getResumeById(
     throw new Error(`이력서 조회 실패: ${error.message}`);
   }
 
-  // content가 문자열(text)로 저장되어 있으므로 다시 객체로 변환
   const content =
     typeof data.content === "string" ? JSON.parse(data.content) : data.content;
 
@@ -84,7 +82,6 @@ export async function updateResume(
   userId: string,
   updates: { title?: string; content?: Partial<ResumeContent> },
 ): Promise<{ id: string; title: string; updated_at: string } | null> {
-  // 기존 데이터를 항상 가져옴 (Partial Update 머지 및 낙관적 잠금을 위해)
   const currentRecord = await getResumeById(resumeId, userId);
   if (!currentRecord) {
     throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
@@ -98,6 +95,23 @@ export async function updateResume(
       ...currentRecord.content,
       ...updates.content,
     };
+
+    if (updates.content.portfolio) {
+      const oldUrls = currentRecord.content.portfolio
+        .map((p) => p.fileUrl)
+        .filter((url): url is string => !!url);
+      const newUrls = (updates.content.portfolio as any[])
+        .map((p) => p.fileUrl)
+        .filter((url): url is string => !!url);
+
+      const removedUrls = oldUrls.filter((url) => !newUrls.includes(url));
+      if (removedUrls.length > 0) {
+        deletePortfolioFilesFromUrls(removedUrls).catch((err) =>
+          console.error("포트폴리오 파일 삭제 중 오류 (업데이트):", err),
+        );
+      }
+    }
+
     body.content = JSON.stringify(mergedContent);
   }
 
@@ -114,7 +128,6 @@ export async function updateResume(
 
   if (error) {
     if (error.code === "PGRST116") {
-      // 조건에 맞는 행이 없거나(ID 불일치) 그 사이 updated_at이 변한 경우
       throw new ConflictError(
         "이미 다른 기기나 탭에서 수정된 내용이 있습니다. 페이지를 새로고침 해주세요.",
       );
@@ -129,6 +142,8 @@ export async function deleteResume(
   resumeId: string,
   userId: string,
 ): Promise<boolean> {
+  const record = await getResumeById(resumeId, userId);
+
   const { error, count } = await supabase
     .from("resumes")
     .delete({ count: "exact" })
@@ -139,5 +154,19 @@ export async function deleteResume(
     throw new Error(`이력서 삭제 실패: ${error.message}`);
   }
 
-  return (count ?? 0) > 0;
+  const isDeleted = (count ?? 0) > 0;
+
+  if (isDeleted && record && record.content.portfolio) {
+    const urls = record.content.portfolio
+      .map((p) => p.fileUrl)
+      .filter((url): url is string => !!url);
+
+    if (urls.length > 0) {
+      deletePortfolioFilesFromUrls(urls).catch((err) =>
+        console.error("포트폴리오 파일 삭제 중 오류 (이력서 삭제):", err),
+      );
+    }
+  }
+
+  return isDeleted;
 }
