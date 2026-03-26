@@ -162,8 +162,9 @@ export async function updateResume(
     throw new Error(`이력서 수정 실패: ${error.message}`);
   }
 
+  // DB 업데이트 성공 후, 이전에 계산해둔 삭제 대상 파일들 처리
   if (removedUrls.length > 0) {
-    deletePortfolioFilesFromUrls(removedUrls).catch((err) =>
+    deletePortfolioFilesFromUrls(userId, removedUrls).catch((err) =>
       console.error("포트폴리오 파일 삭제 중 오류 (업데이트 성공 후):", err),
     );
   }
@@ -195,7 +196,7 @@ export async function deleteResume(
       .filter((url): url is string => !!url);
 
     if (urls.length > 0) {
-      deletePortfolioFilesFromUrls(urls).catch((err) =>
+      deletePortfolioFilesFromUrls(userId, urls).catch((err) =>
         console.error("포트폴리오 파일 삭제 중 오류 (이력서 삭제):", err),
       );
     }

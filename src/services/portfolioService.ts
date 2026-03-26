@@ -75,27 +75,42 @@ function extractObjectPathFromUrl(url: string) {
 
 /**
  * 여러 개의 포트폴리오 URL을 받아 스토리지에서 삭제한다.
+ * 보안을 위해 해당 파일이 사용자의 경로(users/userId/ 또는 temp/users/userId/)에 있는지 확인한다.
  */
-export async function deletePortfolioFilesFromUrls(urls: string[]) {
+export async function deletePortfolioFilesFromUrls(userId: string, urls: string[]) {
   if (urls.length === 0) return;
+
+  const userPrefix = `users/${userId}/`;
+  const tempUserPrefix = `temp/users/${userId}/`;
 
   const objectPaths = urls
     .map((url) => extractObjectPathFromUrl(url))
-    .filter((path): path is string => path !== null);
+    .filter((path): path is string => {
+      if (!path) return false;
+      // 본인의 파일 경로인지 검증 (IDOR 방지)
+      return path.startsWith(userPrefix) || path.startsWith(tempUserPrefix);
+    });
 
-  if (objectPaths.length === 0) return;
+  if (objectPaths.length === 0) {
+    if (urls.length > 0) {
+      logger.warn("포트폴리오 파일 삭제 시도 중 본인 소유가 아닌 파일이 포함됨", { 
+        userId, 
+        urls 
+      });
+    }
+    return;
+  }
 
-  logger.info("포트폴리오 파일 삭제 시작", { count: objectPaths.length, objectPaths });
+  logger.info("포트폴리오 파일 삭제 시작", { userId, count: objectPaths.length, objectPaths });
 
   const { error } = await supabase.storage
     .from(PORTFOLIO_BUCKET)
     .remove(objectPaths);
 
   if (error) {
-    logger.error("포트폴리오 파일 삭제 실패", { error: error.message, objectPaths });
-    // 삭제 실패가 비즈니스 로직 전체를 중단시키지는 않도록 함 (고아 파일 발생 허용)
+    logger.error("포트폴리오 파일 삭제 실패", { userId, error: error.message, objectPaths });
   } else {
-    logger.info("포트폴리오 파일 삭제 성공", { count: objectPaths.length });
+    logger.info("포트폴리오 파일 삭제 성공", { userId, count: objectPaths.length });
   }
 }
 
