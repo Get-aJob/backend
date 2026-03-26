@@ -226,6 +226,9 @@ router.get("/:resumeId", resumeController.getResume);
  *         description: 충돌 (낙관적 잠금 실패)
  *       401:
  *         description: 인증 실패
+ *       400:
+ *         description: 필수 필드 누락
+ *
  */
 // 이력서 수정
 router.patch("/:resumeId", resumeController.updateResume);
