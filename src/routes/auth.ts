@@ -71,6 +71,10 @@ const router = Router();
  *         name:
  *           type: string
  *           example: 홍길동
+ *         profile_image_url:
+ *           type: string
+ *           nullable: true
+ *           example: https://xxx.supabase.co/storage/v1/object/public/profile-images/users/xxx/profile.webp
  */
 
 /**
