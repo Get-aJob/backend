@@ -8,9 +8,6 @@ const router = Router();
 // 모든 이력서 관련 요청에 대해 인증 필요
 router.use(requireAuth);
 
-// 이력서 업로드
-router.post("/", resumeController.uploadResume);
-
 // 이력서 목록 조회
 router.get("/", resumeController.listResumes);
 

@@ -13,6 +13,7 @@ import applicationRouter from "./routes/applicationsRoutes";
 import schedulesRouter from "./routes/schedulesRoutes";
 import scrapsRouter from "./routes/scrapsRoutes";
 import jobsRouter from "./routes/jobsRoutes";
+import portfolioRoutes from "./routes/portfolioRoutes";
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use("/applications", applicationRouter);
 app.use("/schedules", schedulesRouter);
 app.use("/scraps", scrapsRouter);
 app.use("/jobs", jobsRouter);
+app.use("/portfolios", portfolioRoutes);
 
 app.use(errorRouter);
 
