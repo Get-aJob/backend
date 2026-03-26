@@ -6,13 +6,35 @@ import {
   ResumeListResponse,
 } from "../types/resume";
 import { ConflictError, NotFoundError } from "../utils/errors";
-import { deletePortfolioFilesFromUrls } from "./portfolioService";
+import { deletePortfolioFilesFromUrls, finalizePortfolioFile } from "./portfolioService";
+import { Portfolio } from "../types/resume";
+
+/**
+ * 이력서 저장 시 포함된 포트폴리오 파일들을 확정(temp -> permanent)한다.
+ */
+async function finalizeResumePortfolios(portfolios?: Portfolio[]): Promise<void> {
+  if (!portfolios || portfolios.length === 0) return;
+
+  for (const p of portfolios) {
+    if (p.fileUrl && p.fileUrl.includes("/storage/v1/object/public/portfolios/temp/")) {
+      try {
+        const finalizedUrl = await finalizePortfolioFile(p.fileUrl);
+        p.fileUrl = finalizedUrl;
+      } catch (err) {
+        console.error("포트폴리오 파일 확정 중 오류:", err);
+      }
+    }
+  }
+}
 
 export async function createResume(
   userId: string,
   title: string,
   content: ResumeContent,
 ): Promise<ResumeListResponse> {
+  // 저장 전에 포트폴리오 파일 확정
+  await finalizeResumePortfolios(content.portfolio);
+
   const { data, error } = await supabase
     .from("resumes")
     .insert({
@@ -95,6 +117,9 @@ export async function updateResume(
       ...currentRecord.content,
       ...updates.content,
     };
+
+    // 저장 전에 새로 추가된 포트폴리오 파일 확정
+    await finalizeResumePortfolios(mergedContent.portfolio);
 
     if (updates.content.portfolio) {
       const oldUrls = currentRecord.content.portfolio
