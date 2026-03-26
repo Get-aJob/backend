@@ -88,3 +88,18 @@ export async function getManualJobsByUser(userId: string) {
 
   return data || [];
 }
+
+export async function getAutoJobs(limit: number = 50, offset: number = 0) {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select("*")
+    .eq("source_type", "auto")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
