@@ -12,10 +12,8 @@ import {
 } from "./portfolioService";
 import { Portfolio } from "../types/resume";
 
-/**
- * 이력서 저장 시 포함된 포트폴리오 파일들을 확정(temp -> permanent)한다.
- */
 async function finalizeResumePortfolios(
+  userId: string,
   portfolios?: Portfolio[],
 ): Promise<void> {
   if (!portfolios || portfolios.length === 0) return;
@@ -26,7 +24,7 @@ async function finalizeResumePortfolios(
       p.fileUrl.includes("/storage/v1/object/public/portfolios/temp/")
     ) {
       try {
-        const finalizedUrl = await finalizePortfolioFile(p.fileUrl);
+        const finalizedUrl = await finalizePortfolioFile(userId, p.fileUrl);
         p.fileUrl = finalizedUrl;
       } catch (err) {
         console.error("포트폴리오 파일 확정 중 오류:", err);
@@ -40,7 +38,7 @@ export async function createResume(
   title: string,
   content: ResumeContent,
 ): Promise<ResumeListResponse> {
-  await finalizeResumePortfolios(content.portfolio);
+  await finalizeResumePortfolios(userId, content.portfolio);
 
   const { data, error } = await supabase
     .from("resumes")
@@ -127,7 +125,7 @@ export async function updateResume(
       ...updates.content,
     };
 
-    await finalizeResumePortfolios(mergedContent.portfolio);
+    await finalizeResumePortfolios(userId, mergedContent.portfolio);
 
     const oldUrls =
       currentRecord.content.portfolio
@@ -149,7 +147,7 @@ export async function updateResume(
     .update(body)
     .eq("id", resumeId)
     .eq("user_id", userId)
-    .eq("updated_at", currentRecord.updated_at) // 낙관적 잠금 (Optimistic Locking)
+    .eq("updated_at", currentRecord.updated_at)
     .select("id, title, updated_at")
     .single();
 
@@ -162,7 +160,6 @@ export async function updateResume(
     throw new Error(`이력서 수정 실패: ${error.message}`);
   }
 
-  // DB 업데이트 성공 후, 이전에 계산해둔 삭제 대상 파일들 처리
   if (removedUrls.length > 0) {
     deletePortfolioFilesFromUrls(userId, removedUrls).catch((err) =>
       console.error("포트폴리오 파일 삭제 중 오류 (업데이트 성공 후):", err),
