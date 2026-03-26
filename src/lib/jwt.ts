@@ -4,6 +4,7 @@ import { authConfig } from "../config/auth";
 type JwtPayload = {
   id: string;
   email: string;
+  profile_image_url: string | null;
 };
 
 export function signAccessToken(payload: JwtPayload) {

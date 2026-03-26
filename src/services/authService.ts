@@ -37,7 +37,7 @@ function calcRefreshExpiryDate() {
 export async function rotateRefreshToken(rawRefreshToken: string) {
   // 1) JWT 자체 검증 (서명/만료)
   // 여기서 실패하면 "애초에 신뢰할 수 없는 토큰"이므로 401 처리한다.
-  let payload: { id: string; email: string };
+  let payload: { id: string; email: string; profile_image_url: string | null };
   try {
     payload = verifyRefreshToken(rawRefreshToken);
   } catch (error) {
@@ -87,10 +87,12 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   const newAccessToken = signAccessToken({
     id: payload.id,
     email: payload.email,
+    profile_image_url: payload.profile_image_url,
   });
   const newRefreshToken = signRefreshToken({
     id: payload.id,
     email: payload.email,
+    profile_image_url: payload.profile_image_url,
   });
   const newHash = sha256(newRefreshToken);
 
@@ -162,7 +164,7 @@ export async function loginUser({
   // 1) 유저 조회
   const { data: user, error } = await supabase
     .from("users")
-    .select("id, email, password_hash, name")
+    .select("id, email, password_hash, name, profile_image_url")
     .eq("email", email)
     .single();
 
@@ -181,11 +183,13 @@ export async function loginUser({
   const accessToken = signAccessToken({
     id: user.id,
     email: user.email,
+    profile_image_url: user.profile_image_url,
   });
 
   const refreshToken = signRefreshToken({
     id: user.id,
     email: user.email,
+    profile_image_url: user.profile_image_url,
   });
 
   // 4) refresh token DB 저장 (해시된 토큰으로 저장해야 DB가 털려도 원문이 없음)
@@ -207,7 +211,12 @@ export async function loginUser({
 
   return {
     ok: true as const,
-    user: { id: user.id, email: user.email, name: user.name },
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      profile_image_url: user.profile_image_url,
+    },
     accessToken,
     refreshToken,
   };
