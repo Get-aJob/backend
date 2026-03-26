@@ -22,23 +22,33 @@ export async function manualCrawlHandler(req: Request, res: Response) {
   }
 }
 
-export async function getManualJobsHandler(req: Request, res: Response) {
+export async function getJobsHandler(req: Request, res: Response) {
   try {
     const userId = res.locals.user?.id;
-    const sourceType = req.query.sourceType;
+    const sourceType = req.query.sourceType as string;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
 
     if (!userId) {
-      return res.status(401).json({ error: '인증 정보가 없습니다.' });
+      return res.status(401).json({ error: "인증 정보가 없습니다." });
     }
 
-    if (sourceType !== 'manual') {
-      return res.status(400).json({ error: 'sourceType=manual 필터가 필수입니다.' });
+    if (!sourceType) {
+      return res.status(400).json({ error: "sourceType 필터가 필수입니다. (auto 또는 manual)" });
     }
 
-    const jobs = await jobsService.getManualJobsByUser(userId);
+    let jobs;
+    if (sourceType === "auto") {
+      jobs = await jobsService.getAutoJobs(limit, offset);
+    } else if (sourceType === "manual") {
+      jobs = await jobsService.getManualJobsByUser(userId);
+    } else {
+      return res.status(400).json({ error: "유효하지 않은 sourceType입니다. (auto 또는 manual)" });
+    }
+
     res.status(200).json({ jobs });
   } catch (error: any) {
-    console.error('GET /api/jobs error:', error);
-    res.status(500).json({ error: '데이터 조회 중 오류가 발생했습니다.' });
+    console.error("GET /jobs error:", error);
+    res.status(500).json({ error: "데이터 조회 중 오류가 발생했습니다." });
   }
 }

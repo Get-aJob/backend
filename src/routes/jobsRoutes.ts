@@ -38,7 +38,7 @@ router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
  * @swagger
  * /jobs:
  *   get:
- *     summary: 사용자별 채용 공고 조회 (수동 크롤링 전용)
+ *     summary: 채용 공고 조회 (자동/수동 필터링)
  *     tags: [Jobs]
  *     security:
  *       - cookieAuth: []
@@ -46,17 +46,30 @@ router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
  *       - in: query
  *         name: sourceType
  *         required: true
+ *         description: 공고 출처 필터 (auto, manual)
  *         schema:
  *           type: string
- *           enum: [manual]
+ *           enum: [auto, manual]
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
  *     responses:
  *       200:
  *         description: 조회 성공
+ *       400:
+ *         description: 잘못된 요청 (sourceType 누락 등)
  *       401:
  *         description: 인증 실패
  *       500:
  *         description: 서버 오류
  */
-router.get("/", requireAuth, jobsController.getManualJobsHandler);
+router.get("/", requireAuth, jobsController.getJobsHandler);
 
 export default router;
