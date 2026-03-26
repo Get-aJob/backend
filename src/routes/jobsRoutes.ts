@@ -72,4 +72,34 @@ router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
  */
 router.get("/", requireAuth, jobsController.getJobsHandler);
 
+/**
+ * @swagger
+ * /jobs/manual/{externalId}:
+ *   delete:
+ *     summary: 수동 채용 공고 삭제
+ *     description: 본인이 등록한 수동 공고를 externalId로 삭제합니다. source_type=manual + external_id + created_by(userId) 3중 검증으로 본인 공고만 삭제 가능합니다.
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: externalId
+ *         required: true
+ *         description: 삭제할 공고의 external_id
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: 삭제 성공 (응답 본문 없음)
+ *       400:
+ *         description: externalId 누락
+ *       401:
+ *         description: 인증 실패
+ *       404:
+ *         description: 해당 공고 없음 또는 삭제 권한 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJobHandler);
+
 export default router;

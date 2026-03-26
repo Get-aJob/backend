@@ -21,19 +21,22 @@ export async function crawlAndSaveJob(url: string, userId: string) {
     );
 
     const responseData = response.data as any;
-    const crawledData = (responseData && responseData.success && responseData.data) 
-      ? responseData.data as CrawledJob 
-      : responseData as CrawledJob;
+    const crawledData =
+      responseData && responseData.success && responseData.data
+        ? (responseData.data as CrawledJob)
+        : (responseData as CrawledJob);
 
-    // deadline 처리: timestamp 형식이 아니면 deadline_text에 저장
     const rawDeadline = String(crawledData.deadline || "").trim();
     let deadline = null;
     let deadlineText = null;
 
     if (rawDeadline) {
       const parsedDate = new Date(rawDeadline);
-      // 1. 숫자가 포함되어 있고 2. Date 객체로 변환 가능하며 3. 너무 짧지 않은 경우에만 날짜로 간주
-      if (!isNaN(parsedDate.getTime()) && /\d/.test(rawDeadline) && rawDeadline.length > 5) {
+      if (
+        !isNaN(parsedDate.getTime()) &&
+        /\d/.test(rawDeadline) &&
+        rawDeadline.length > 5
+      ) {
         deadline = parsedDate.toISOString();
       } else {
         deadlineText = rawDeadline;
@@ -52,12 +55,14 @@ export async function crawlAndSaveJob(url: string, userId: string) {
       experience: crawledData.experience || null,
       deadline: deadline,
       deadline_text: deadlineText,
-      external_id: String(crawledData.externalId || crawledData.external_id || ""),
+      external_id: String(
+        crawledData.externalId || crawledData.external_id || "",
+      ),
     };
 
     const { data, error } = await supabase
       .from(TABLE_NAME)
-      .upsert(jobData, { 
+      .upsert(jobData, {
         onConflict: "source_type,external_id", // 쉼표 사이 공백 제거
       })
       .select()
@@ -102,4 +107,24 @@ export async function getAutoJobs(limit: number = 50, offset: number = 0) {
   }
 
   return data || [];
+}
+
+export async function deleteManualJob(userId: string, externalId: string) {
+  const { data, error, count } = await supabase
+    .from(TABLE_NAME)
+    .delete({ count: "exact" })
+    .eq("source_type", "manual")
+    .eq("external_id", externalId)
+    .eq("created_by", userId)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null;
+    }
+    throw error;
+  }
+
+  return data;
 }
