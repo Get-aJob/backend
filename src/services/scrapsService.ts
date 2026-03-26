@@ -65,11 +65,14 @@ export async function getScrapsByUser(
         .eq('user_id', userId);
 
     if (sortBy === 'deadline') {
-        query = query.order('deadline', {
-            ascending: true,
-            nullsFirst: false,
-            foreignTable: 'job_postings',
-        } as any);
+        query = query
+            .order('deadline', {
+                ascending: true,
+                nullsFirst: false,
+                foreignTable: 'job_postings',
+            } as any)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false });
     } else {
         query = query.order(sortBy, { ascending: false });
     }
@@ -123,19 +126,6 @@ export async function getScrapsByUser(
             createdAt: row?.createdAt ? String(row.createdAt).split("T")[0] : "",
         };
     });
-
-    if (sortBy === 'deadline') {
-        return mappedRows.sort((a: any, b: any) => {
-            const aDeadline = a.deadline ?? "";
-            const bDeadline = b.deadline ?? "";
-
-            if (!aDeadline && !bDeadline) return 0;
-            if (!aDeadline) return 1;
-            if (!bDeadline) return -1;
-
-            return aDeadline.localeCompare(bDeadline);
-        });
-    }
 
     return mappedRows;
 }

@@ -46,10 +46,17 @@ export async function getMyScrapsHandler(req: AuthRequest, res: Response) {
         const parsedLimit = typeof limit === 'string' ? Number(limit) : 20;
         const parsedOffset = typeof offset === 'string' ? Number(offset) : 0;
 
+        if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+            return res.status(400).json({ error: 'limit은 1~100 사이의 정수여야 합니다.' });
+        }
+        if (!Number.isInteger(parsedOffset) || parsedOffset < 0) {
+            return res.status(400).json({ error: 'offset은 0 이상의 정수여야 합니다.' });
+        }
+
         const scraps = await getScrapsByUser(
             userId,
-            Number.isFinite(parsedLimit) ? parsedLimit : 20,
-            Number.isFinite(parsedOffset) ? parsedOffset : 0,
+            parsedLimit,
+            parsedOffset,
             normalizedOrderBy
         );
         res.status(200).json({ scraps });
