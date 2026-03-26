@@ -1,5 +1,5 @@
 import {Router} from 'express';
-import {toggleScrapHandler} from '../controllers/scrapsController';
+import {toggleScrapHandler, getMyScrapsHandler} from '../controllers/scrapsController';
 import {requireAuth} from '../middlewares/requireAuth';
 
 const router = Router();
@@ -60,5 +60,81 @@ const router = Router();
  *                   example: 스크랩 처리에 실패했습니다.
  */
 router.post('/:jobPostingId', requireAuth, toggleScrapHandler);
+
+/**
+ * @swagger
+ * /scraps:
+ *   get:
+ *     summary: 내 스크랩 목록 조회
+ *     description: 로그인 사용자의 스크랩 목록을 조회합니다.
+ *     tags:
+ *       - Scraps
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: offset
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *       - in: query
+ *         name: sortBy
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [recent, deadline]
+ *           default: recent
+ *         description: recent=스크랩 최신순(created_at desc), deadline=마감임박순(deadline asc, null은 마지막)
+ *     responses:
+ *       200:
+ *         description: 스크랩 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 scraps:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       jobPostingId:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       companyName:
+ *                         type: string
+ *                       deadline:
+ *                         type: string
+ *                         example: 2026-03-23
+ *                       location:
+ *                         type: string
+ *                       experience:
+ *                         type: string
+ *                       isApplied:
+ *                         type: boolean
+ *                         description: applications 테이블에서 applied_at 값이 존재하면 true
+ *                       expired:
+ *                         type: boolean
+ *                         description: 마감일(deadline)이 오늘보다 이전이면 true
+ *                       companyLogo:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         example: 2026-03-25
+ *       401:
+ *         description: 인증 실패
+ *       500:
+ *         description: 서버 오류
+ */
+
+router.get('/', requireAuth, getMyScrapsHandler);
 
 export default router;
