@@ -6,17 +6,25 @@ import {
   ResumeListResponse,
 } from "../types/resume";
 import { ConflictError, NotFoundError } from "../utils/errors";
-import { deletePortfolioFilesFromUrls, finalizePortfolioFile } from "./portfolioService";
+import {
+  deletePortfolioFilesFromUrls,
+  finalizePortfolioFile,
+} from "./portfolioService";
 import { Portfolio } from "../types/resume";
 
 /**
  * 이력서 저장 시 포함된 포트폴리오 파일들을 확정(temp -> permanent)한다.
  */
-async function finalizeResumePortfolios(portfolios?: Portfolio[]): Promise<void> {
+async function finalizeResumePortfolios(
+  portfolios?: Portfolio[],
+): Promise<void> {
   if (!portfolios || portfolios.length === 0) return;
 
   for (const p of portfolios) {
-    if (p.fileUrl && p.fileUrl.includes("/storage/v1/object/public/portfolios/temp/")) {
+    if (
+      p.fileUrl &&
+      p.fileUrl.includes("/storage/v1/object/public/portfolios/temp/")
+    ) {
       try {
         const finalizedUrl = await finalizePortfolioFile(p.fileUrl);
         p.fileUrl = finalizedUrl;
@@ -32,7 +40,6 @@ export async function createResume(
   title: string,
   content: ResumeContent,
 ): Promise<ResumeListResponse> {
-  // 저장 전에 포트폴리오 파일 확정
   await finalizeResumePortfolios(content.portfolio);
 
   const { data, error } = await supabase
@@ -40,7 +47,7 @@ export async function createResume(
     .insert({
       user_id: userId,
       title,
-      content: JSON.stringify(content), // 객체를 문자열로 저장
+      content: JSON.stringify(content),
     })
     .select("id, title, created_at")
     .single();
@@ -110,6 +117,8 @@ export async function updateResume(
   }
 
   const body: any = {};
+  let removedUrls: string[] = [];
+
   if (updates.title) body.title = updates.title;
 
   if (updates.content) {
@@ -118,25 +127,18 @@ export async function updateResume(
       ...updates.content,
     };
 
-    // 저장 전에 새로 추가된 포트폴리오 파일 확정
     await finalizeResumePortfolios(mergedContent.portfolio);
 
-    if (updates.content.portfolio) {
-      const oldUrls = currentRecord.content.portfolio
-        .map((p) => p.fileUrl)
-        .filter((url): url is string => !!url);
-      const newUrls = (updates.content.portfolio as any[])
-        .map((p) => p.fileUrl)
-        .filter((url): url is string => !!url);
+    const oldUrls =
+      currentRecord.content.portfolio
+        ?.map((p) => p.fileUrl)
+        .filter((url): url is string => !!url) || [];
+    const newUrls =
+      mergedContent.portfolio
+        ?.map((p) => p.fileUrl)
+        .filter((url): url is string => !!url) || [];
 
-      const removedUrls = oldUrls.filter((url) => !newUrls.includes(url));
-      if (removedUrls.length > 0) {
-        deletePortfolioFilesFromUrls(removedUrls).catch((err) =>
-          console.error("포트폴리오 파일 삭제 중 오류 (업데이트):", err),
-        );
-      }
-    }
-
+    removedUrls = oldUrls.filter((url) => !newUrls.includes(url));
     body.content = JSON.stringify(mergedContent);
   }
 
@@ -158,6 +160,12 @@ export async function updateResume(
       );
     }
     throw new Error(`이력서 수정 실패: ${error.message}`);
+  }
+
+  if (removedUrls.length > 0) {
+    deletePortfolioFilesFromUrls(removedUrls).catch((err) =>
+      console.error("포트폴리오 파일 삭제 중 오류 (업데이트 성공 후):", err),
+    );
   }
 
   return data;
