@@ -8,19 +8,15 @@ import {
 } from "../lib/jwt";
 import { logger } from "../utils/logger";
 import type { IGoogleToken, IGoogleUser } from "../types/google";
+import { uploadProfileImageFromBuffer } from "./profileImageService";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const BASE_URL = process.env.BASE_URL;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3009";
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-import { supabase } from '../lib/supabase';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../lib/jwt';
-import { uploadProfileImageFromBuffer } from './profileImageService';
 
 function sha256(input: string) {
-  return crypto.createHash('sha256').update(input).digest('hex');
+  return crypto.createHash("sha256").update(input).digest("hex");
 }
 
 /**
@@ -53,7 +49,7 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   try {
     payload = verifyRefreshToken(rawRefreshToken);
   } catch (error) {
-    return { ok: false as const, code: 'UNAUTHORIZED' as const };
+    return { ok: false as const, code: "UNAUTHORIZED" as const };
   }
 
   // [2] 전달받은 refresh 토큰을 hash로 변환해 DB 조회 키로 사용
@@ -61,9 +57,9 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
 
   // [3] DB에서 현재 refresh 레코드 조회
   const { data: current, error } = await supabase
-    .from('refresh_tokens')
-    .select('user_id, token_hash, expires_at, revoked_at')
-    .eq('token_hash', tokenHash)
+    .from("refresh_tokens")
+    .select("user_id, token_hash, expires_at, revoked_at")
+    .eq("token_hash", tokenHash)
     .single();
 
   // [4] 레코드가 없으면 "이미 회전되어 사라진 토큰 재사용"일 가능성이 높다.
@@ -71,23 +67,26 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   if (error || !current) {
     // reuse-detection: 해당 유저(=payload.id) 전체 세션 폐기
     await supabase
-      .from('refresh_tokens')
+      .from("refresh_tokens")
       .update({ revoked_at: new Date().toISOString() })
-      .eq('user_id', payload.id)
-      .is('revoked_at', null);
+      .eq("user_id", payload.id)
+      .is("revoked_at", null);
 
-    return { ok: false as const, code: 'REUSE_DETECTED' as const };
+    return { ok: false as const, code: "REUSE_DETECTED" as const };
   }
 
   // [5] 토큰이 존재하더라도 이미 revoke 되었거나 만료되었으면 비정상 사용으로 본다.
   // 이 경우도 보수적으로 전체 세션 revoke 처리해 추가 피해를 차단한다.
-  if (current.revoked_at || new Date(current.expires_at).getTime() < Date.now()) {
+  if (
+    current.revoked_at ||
+    new Date(current.expires_at).getTime() < Date.now()
+  ) {
     await supabase
-      .from('refresh_tokens')
+      .from("refresh_tokens")
       .update({ revoked_at: new Date().toISOString() })
-      .eq('user_id', current.user_id)
-      .is('revoked_at', null);
-    return { ok: false as const, code: 'REUSE_DETECTED' as const };
+      .eq("user_id", current.user_id)
+      .is("revoked_at", null);
+    return { ok: false as const, code: "REUSE_DETECTED" as const };
   }
 
   // [6] 정상 경로: 토큰 회전 수행
@@ -110,15 +109,15 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   // [7] 기존 refresh 레코드를 먼저 revoke 처리
   // is("revoked_at", null) 조건으로 중복 revoke/경쟁 상황을 완화한다.
   const { error: revokeErr } = await supabase
-    .from('refresh_tokens')
+    .from("refresh_tokens")
     .update({ revoked_at: nowIso })
-    .eq('token_hash', tokenHash)
-    .is('revoked_at', null);
+    .eq("token_hash", tokenHash)
+    .is("revoked_at", null);
   if (revokeErr) throw new Error(revokeErr.message);
 
   // [8] 새 refresh hash 저장
   // 여기까지 성공해야만 "회전 완료" 상태가 된다.
-  const { error: insertErr } = await supabase.from('refresh_tokens').insert({
+  const { error: insertErr } = await supabase.from("refresh_tokens").insert({
     user_id: payload.id,
     token_hash: newHash,
     expires_at: calcRefreshExpiryDate(),
@@ -148,13 +147,13 @@ export async function registerUser({
   const passwordHash = await bcrypt.hash(password, 12);
 
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .insert({
       email: email,
       password_hash: passwordHash,
       name: name,
     })
-    .select('id, email, name, created_at')
+    .select("id, email, name, created_at")
     .single();
 
   if (error) {
@@ -169,7 +168,7 @@ export async function registerUser({
         contentType: file.mimetype,
       });
     } catch (uploadError) {
-      console.error('프로필 이미지 업로드 실패:', uploadError);
+      console.error("프로필 이미지 업로드 실패:", uploadError);
     }
   }
 
@@ -223,9 +222,9 @@ export async function loginUser({
 }) {
   // 1) 유저 조회
   const { data: user, error } = await supabase
-    .from('users')
-    .select('id, email, password_hash, name, profile_image_url')
-    .eq('email', email)
+    .from("users")
+    .select("id, email, password_hash, name, profile_image_url")
+    .eq("email", email)
     .single();
 
   // 이메일이 없거나 조회 에러면 동일하게 실패 처리
@@ -259,24 +258,30 @@ export async function loginUser({
   };
 }
 // 메모리 저장(개발용). 운영에서는 redis/DB 권장
-const resetSessionStore = new Map<string, { userId: string; expiresAt: number }>();
+const resetSessionStore = new Map<
+  string,
+  { userId: string; expiresAt: number }
+>();
 
 function generateResetToken() {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
-export async function requestPasswordResetService(params: { email: string; name: string }) {
+export async function requestPasswordResetService(params: {
+  email: string;
+  name: string;
+}) {
   const { email, name } = params;
 
   const { data: user, error } = await supabase
-    .from('users')
-    .select('id, email, name')
-    .eq('email', email)
-    .eq('name', name)
+    .from("users")
+    .select("id, email, name")
+    .eq("email", email)
+    .eq("name", name)
     .single();
 
   if (error || !user) {
-    return { ok: false as const, code: 'USER_NOT_FOUND' as const };
+    return { ok: false as const, code: "USER_NOT_FOUND" as const };
   }
 
   const resetToken = generateResetToken();
@@ -301,20 +306,20 @@ export async function confirmPasswordResetService(params: {
 
   const session = resetSessionStore.get(resetToken);
   if (!session) {
-    return { ok: false as const, code: 'INVALID_RESET_TOKEN' as const };
+    return { ok: false as const, code: "INVALID_RESET_TOKEN" as const };
   }
 
   if (session.expiresAt < Date.now()) {
     resetSessionStore.delete(resetToken);
-    return { ok: false as const, code: 'RESET_TOKEN_EXPIRED' as const };
+    return { ok: false as const, code: "RESET_TOKEN_EXPIRED" as const };
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   const { error } = await supabase
-    .from('users')
+    .from("users")
     .update({ password_hash: passwordHash })
-    .eq('id', session.userId);
+    .eq("id", session.userId);
   if (error) {
     throw new Error(error.message);
   }
@@ -414,9 +419,7 @@ export async function exchangeCodeForTokens(
   return data;
 }
 
-function isGoogleUserInfo(
-  value: unknown,
-): value is {
+function isGoogleUserInfo(value: unknown): value is {
   id: string;
   email: string;
   name?: string;
@@ -444,7 +447,10 @@ export async function getUserInfo(accessToken: string): Promise<IGoogleUser> {
   });
   if (!res.ok) {
     const err = await res.text();
-    logger.error("Failed to fetch user info", { status: res.status, body: err });
+    logger.error("Failed to fetch user info", {
+      status: res.status,
+      body: err,
+    });
     throw new Error("Failed to fetch user info");
   }
   const data: unknown = await res.json();
@@ -479,12 +485,16 @@ export async function findOrCreateGoogleUser(
   }
 
   if (existingUser) {
-    const updatePayload: { name?: string; profile_image_url?: string | null } = {};
+    const updatePayload: { name?: string; profile_image_url?: string | null } =
+      {};
 
     if (googleUser.name && googleUser.name !== existingUser.name) {
       updatePayload.name = googleUser.name;
     }
-    if (googleUser.picture && googleUser.picture !== existingUser.profile_image_url) {
+    if (
+      googleUser.picture &&
+      googleUser.picture !== existingUser.profile_image_url
+    ) {
       updatePayload.profile_image_url = googleUser.picture;
     }
 
