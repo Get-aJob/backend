@@ -95,9 +95,9 @@ export async function getManualJobsByUser(userId: string) {
 }
 
 export async function getAutoJobs(limit: number = 50, offset: number = 0) {
-  const { data, error } = await supabase
+  const { data, count, error } = await supabase
     .from(TABLE_NAME)
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("source_type", "auto")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -106,7 +106,24 @@ export async function getAutoJobs(limit: number = 50, offset: number = 0) {
     throw error;
   }
 
-  return data || [];
+  const { data: sitesData, error: sitesError } = await supabase
+    .from(TABLE_NAME)
+    .select("source_site_name")
+    .eq("source_type", "auto");
+
+  if (sitesError) {
+    throw sitesError;
+  }
+
+  const sourceSites = Array.from(
+    new Set(sitesData?.map((item) => item.source_site_name).filter(Boolean))
+  );
+
+  return {
+    jobs: data || [],
+    totalCount: count || 0,
+    sourceSites,
+  };
 }
 
 export async function deleteManualJob(userId: string, externalId: string) {

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router } from 'express';
 import {
   join,
   login,
@@ -7,10 +7,9 @@ import {
   refresh,
   requestPasswordReset,
   confirmPasswordReset,
-  googleLogin,
-  callback,
-} from "../controllers/authController";
-import { requireAuth } from "../middlewares/requireAuth";
+} from '../controllers/authController';
+import { requireAuth } from '../middlewares/requireAuth';
+import { profileImageUploadSingle } from '../middlewares/upload';
 
 const router = Router();
 
@@ -114,7 +113,7 @@ const router = Router();
  *                   type: string
  *                   example: 필수 정보를 입력하지 않았습니다.
  */
-router.post("/join", join);
+router.post('/join', profileImageUploadSingle, join);
 
 /**
  * @swagger
@@ -160,7 +159,7 @@ router.post("/join", join);
  *                   type: string
  *                   example: UNAUTHORIZED
  */
-router.post("/login", login);
+router.post('/login', login);
 
 /**
  * @swagger
@@ -184,7 +183,7 @@ router.post("/login", login);
  *       401:
  *         description: 인증 실패
  */
-router.get("/me", requireAuth, me);
+router.get('/me', requireAuth, me);
 
 /**
  * @swagger
@@ -205,7 +204,7 @@ router.get("/me", requireAuth, me);
  *                   type: string
  *                   example: 로그아웃에 성공했습니다.
  */
-router.post("/logout", logout);
+router.post('/logout', logout);
 
 /**
  * @swagger
@@ -236,7 +235,7 @@ router.post("/logout", logout);
  *                   type: string
  *                   example: TOKEN_REUSE_DETECTED
  */
-router.post("/refresh", refresh);
+router.post('/refresh', refresh);
 
 /**
  * @swagger
