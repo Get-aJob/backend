@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
+import { optionalAuth } from "../middlewares/optionalAuth";
 import * as jobsController from "../controllers/jobsController";
 
 const router = Router();
@@ -70,7 +71,7 @@ router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
  *       500:
  *         description: 서버 오류
  */
-router.get("/", requireAuth, jobsController.getJobsHandler);
+router.get("/", optionalAuth, jobsController.getJobsHandler);
 
 /**
  * @swagger
