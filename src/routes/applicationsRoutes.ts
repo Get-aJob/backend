@@ -16,18 +16,33 @@ const router = Router();
  * /applications/user:
  *   get:
  *     summary: 사용자 지원 현황 조회
- *     description: 인증된 사용자의 모든 지원 내역을 조회합니다.
+ *     description: 인증된 사용자의 지원 내역을 페이지네이션으로 조회합니다.
  *     tags:
  *       - Applications
  *     security:
  *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: 페이지 크기
+ *       - in: query
+ *         name: offset
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: 시작 위치(무한 스크롤 다음 요청 시 nextOffset 사용)
  *     responses:
  *       200:
  *         description: 지원 목록 조회 성공
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ApplicationsResponse'
+ *               $ref: '#/components/schemas/ApplicationsByUserResponse'
  *       401:
  *         description: 인증 실패
  */
@@ -246,6 +261,30 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *           type: object
  *           nullable: true
  *           description: 연관 채용공고 정보
+ *         histories:
+ *           type: array
+ *           description: 지원 상태 변경 히스토리 목록
+ *           items:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *               fromStatusId:
+ *                 type: string
+ *                 nullable: true
+ *               toStatusId:
+ *                 type: string
+ *               toStatusName:
+ *                 type: string
+ *                 nullable: true
+ *                 description: toStatusId에 해당하는 진행 상태명(display_name)
+ *               changedByUserId:
+ *                 type: string
+ *                 nullable: true
+ *               changedAt:
+ *                 type: string
+ *                 format: date
+ *                 example: 2026-03-27
  *     ApplicationResponse:
  *       type: object
  *       properties:
@@ -258,6 +297,32 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/Application'
+ *     ApplicationsByUserResponse:
+ *       type: object
+ *       properties:
+ *         applications:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Application'
+ *         pagination:
+ *           type: object
+ *           properties:
+ *             totalCount:
+ *               type: integer
+ *               example: 123
+ *             hasNext:
+ *               type: boolean
+ *               example: true
+ *             nextOffset:
+ *               type: integer
+ *               nullable: true
+ *               example: 20
+ *             limit:
+ *               type: integer
+ *               example: 20
+ *             offset:
+ *               type: integer
+ *               example: 0
  *     ApplicationStatus:
  *       type: object
  *       properties:

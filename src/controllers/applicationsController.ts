@@ -59,6 +59,14 @@ function toDbApplication(input: Record<string, unknown> = {}) {
 function toApiApplication(row: any) {
   if (!row) return row
   const status = row.application_statuses?.display_name ?? null
+  const histories = (row.application_status_histories ?? []).map((history: any) => ({
+    id: history.id,
+    fromStatusId: history.from_status_id,
+    toStatusId: history.to_status_id,
+    toStatusName: history.to_status_name ?? null,
+    changedByUserId: history.changed_by_user_id,
+    changedAt: history.changed_at ? String(history.changed_at).split('T')[0] : null,
+  }))
   return {
     id: row.id,
     jobPostingId: row.job_posting_id,
@@ -68,6 +76,7 @@ function toApiApplication(row: any) {
     appliedAt: row.applied_at,
     notes: row.notes,
     jobPostings: row.job_postings,
+    histories,
   }
 }
 
@@ -91,8 +100,24 @@ export async function listApplicationsByUser(req: AuthRequest, res: Response<any
     if (!userId) {
       return res.status(400).json({ error: '유효한 사용자 정보가 없습니다.' })
     }
-    const data = await getApplicationsByUser(userId)
-    res.status(200).json({ applications: data.map(toApiApplication) })
+
+    const rawLimit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 20
+    const rawOffset = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 20
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0
+
+    const result = await getApplicationsByUser(userId, limit, offset)
+
+    res.status(200).json({
+      applications: result.items.map(toApiApplication),
+      pagination: {
+        totalCount: result.totalCount,
+        hasNext: result.hasNext,
+        nextOffset: result.nextOffset,
+        limit: result.limit,
+        offset: result.offset,
+      },
+    })
   } catch (err) {
     console.error('GET /applications/user', err)
     res.status(500).json({ error: '사용자 지원 내역 조회에 실패했습니다.' })
