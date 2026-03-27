@@ -39,14 +39,45 @@ export async function getAllApplications() {
 export async function getApplicationById(id: string) {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*, application_statuses(display_name)')
+    .select('*, application_statuses(display_name), application_status_histories(to_status_id,changed_at)')
     .eq('id', id)
+    .order('changed_at', { foreignTable: STATUS_TABLE_NAME, ascending: true })
     .maybeSingle()
 
   if (error) {
     const e = new Error(error.message) as Error & { code?: string }
     e.code = error.code
     throw e
+  }
+
+  if (data?.application_status_histories?.length) {
+    const toStatusIds = Array.from(
+      new Set(
+        (data.application_status_histories as any[])
+          .map((history: any) => history?.to_status_id)
+          .filter((statusId: any) => typeof statusId === 'string' && statusId.length > 0)
+      )
+    )
+
+    if (toStatusIds.length > 0) {
+      const { data: statuses, error: statusesError } = await supabase
+        .from('application_statuses')
+        .select('id, display_name')
+        .in('id', toStatusIds)
+
+      if (statusesError) {
+        const e = new Error(statusesError.message) as Error & { code?: string }
+        e.code = statusesError.code
+        throw e
+      }
+
+      const statusNameMap = new Map((statuses ?? []).map((status: any) => [status.id, status.display_name]))
+
+      data.application_status_histories = (data.application_status_histories as any[]).map((history: any) => ({
+        ...history,
+        to_status_name: history?.to_status_id ? (statusNameMap.get(history.to_status_id) ?? null) : null,
+      }))
+    }
   }
 
   return data ?? null
@@ -165,12 +196,14 @@ export async function deleteApplication(id: string) {
   return data ?? []
 }
 
-export async function getApplicationsByUser(userId: string) {
-  const { data, error } = await supabase
+export async function getApplicationsByUser(userId: string, limit = 20, offset = 0) {
+  const { data, error, count } = await supabase
     .from(TABLE_NAME)
-    .select('*, job_postings(title, content, company_name), application_statuses(display_name)')
+    .select('*, job_postings(title, content, company_name), application_statuses(display_name)', { count: 'exact' })
     .eq('user_id', userId)
     .order('applied_at', { ascending: false })
+    .order('id', { ascending: false })
+    .range(offset, offset + limit - 1)
 
   if (error) {
     const e = new Error(error.message) as Error & { code?: string }
@@ -178,7 +211,19 @@ export async function getApplicationsByUser(userId: string) {
     throw e
   }
 
-  return data ?? []
+  const items = data ?? []
+  const totalCount = count ?? 0
+  const hasNext = offset + items.length < totalCount
+  const nextOffset = hasNext ? offset + items.length : null
+
+  return {
+    items,
+    totalCount,
+    hasNext,
+    nextOffset,
+    limit,
+    offset,
+  }
 }
 
 export async function getApplicationsByJob(jobPostingId: string) {
