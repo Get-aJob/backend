@@ -29,10 +29,6 @@ export async function getJobsHandler(req: Request, res: Response) {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    if (!userId) {
-      return res.status(401).json({ error: "인증 정보가 없습니다." });
-    }
-
     if (!sourceType) {
       return res.status(400).json({ error: "sourceType 필터가 필수입니다. (auto 또는 manual)" });
     }
@@ -45,6 +41,9 @@ export async function getJobsHandler(req: Request, res: Response) {
         sourceSites: result.sourceSites
       });
     } else if (sourceType === "manual") {
+      if (!userId) {
+        return res.status(401).json({ error: "인증 정보가 없습니다." });
+      }
       const jobs = await jobsService.getManualJobsByUser(userId);
       return res.status(200).json({ jobs });
     } else {
