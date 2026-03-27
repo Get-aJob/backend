@@ -52,3 +52,29 @@ export async function getJobsHandler(req: Request, res: Response) {
     res.status(500).json({ error: "데이터 조회 중 오류가 발생했습니다." });
   }
 }
+
+export async function deleteManualJobHandler(req: Request, res: Response) {
+  try {
+    const userId = res.locals.user?.id;
+    const externalId = req.params.externalId as string;
+
+    if (!userId) {
+      return res.status(401).json({ error: "인증 정보가 없습니다." });
+    }
+
+    if (!externalId || typeof externalId !== 'string') {
+      return res.status(400).json({ error: "externalId가 필요합니다." });
+    }
+
+    const deleted = await jobsService.deleteManualJob(userId, externalId);
+
+    if (!deleted) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없거나 삭제 권한이 없습니다." });
+    }
+
+    res.status(204).send();
+  } catch (error: any) {
+    console.error("DELETE /jobs/manual/:externalId error:", error);
+    res.status(500).json({ error: "공고 삭제 중 오류가 발생했습니다." });
+  }
+}
