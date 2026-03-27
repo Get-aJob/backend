@@ -237,7 +237,56 @@ router.post('/logout', logout);
  */
 router.post('/refresh', refresh);
 
-router.post('/password/reset', requestPasswordReset);
-router.put('/password/reset', confirmPasswordReset);
+/**
+ * @swagger
+ * /auth/google:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Google 로그인 시작
+ *     description: Google OAuth 동의 화면으로 302 리다이렉트합니다.
+ *     responses:
+ *       302:
+ *         description: Google 동의 화면으로 리다이렉트
+ *       500:
+ *         description: Google OAuth 설정 누락 등 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: SERVER ERROR
+ */
+router.get("/google", googleLogin);
+
+/**
+ * @swagger
+ * /auth/callback:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Google OAuth 콜백 처리
+ *     description: 인가 코드를 교환해 사용자 확인 후, 기존 로그인과 동일하게 access/refresh 쿠키를 세팅하고 프론트로 리다이렉트합니다.
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Google OAuth 인가 코드
+ *       - in: query
+ *         name: error
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: OAuth 오류 코드(사용자 취소 등)
+ *     responses:
+ *       302:
+ *         description: 인증 처리 후 프론트 화면으로 리다이렉트
+ */
+router.get("/callback", callback);
+
+router.post("/password/reset", requestPasswordReset);
+router.put("/password/reset", confirmPasswordReset);
 
 export default router;
