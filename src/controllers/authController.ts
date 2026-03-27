@@ -5,9 +5,41 @@ import {
   rotateRefreshToken,
   requestPasswordResetService,
   confirmPasswordResetService,
+  getConsentUrl,
+  getFrontendUrl,
+  exchangeCodeForTokens,
+  getUserInfo,
+  findOrCreateGoogleUser,
+  issueSession,
 } from "../services/authService";
 import { accessCookieOptions, refreshCookieOptions } from "../config/auth";
 import { logger } from "../utils/logger";
+
+function setAuthCookies(
+  res: Response,
+  tokens: { accessToken: string; refreshToken: string },
+) {
+  res.cookie("access_token", tokens.accessToken, accessCookieOptions());
+  res.cookie("refresh_token", tokens.refreshToken, refreshCookieOptions());
+}
+
+function clearAuthCookies(res: Response) {
+  res.clearCookie("access_token", {
+    httpOnly: true,
+    secure: accessCookieOptions().secure,
+    sameSite: accessCookieOptions().sameSite,
+    domain: accessCookieOptions().domain,
+    path: accessCookieOptions().path,
+  });
+
+  res.clearCookie("refresh_token", {
+    httpOnly: true,
+    secure: refreshCookieOptions().secure,
+    sameSite: refreshCookieOptions().sameSite,
+    domain: refreshCookieOptions().domain,
+    path: refreshCookieOptions().path,
+  });
+}
 
 export async function join(req: Request, res: Response) {
   // 0-3-3에서 구현: 이메일/비번 받아 회원 생성
@@ -35,15 +67,75 @@ export async function login(req: Request, res: Response) {
     return res.status(401).json({ error: "UNAUTHORIZED" });
   }
 
-  res.cookie("access_token", result.accessToken, accessCookieOptions());
-  res.cookie("refresh_token", result.refreshToken, refreshCookieOptions());
+  setAuthCookies(res, {
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+  });
 
   logger.info("유저 로그인:", { email: email });
   return res.status(200).json({
     user: result.user,
   });
 }
+export async function googleLogin(req: Request, res: Response) {
+  const url = getConsentUrl();
+  if (!url) {
+    logger.error("Google 리다이렉트 URL 요청 에러", {
+      GOOGLE_CLIENT_ID_SET: !!process.env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET_SET: !!process.env.GOOGLE_CLIENT_SECRET,
+    });
+    return res.status(500).json({ message: "SERVER ERROR" });
+  }
 
+  logger.info("Google 동의 URL로 리다이렉트", { url });
+  return res.redirect(302, url);
+}
+export async function callback(req: Request, res: Response) {
+  const { code, error } = req.query;
+
+  const frontRoot = getFrontendUrl("/");
+
+  logger.info("GET /auth/callback 요청 수신", { query: req.query });
+
+  if (error) {
+    logger.error("Google OAuth 에러 파라미터 수신", { error });
+    return res.redirect(302, frontRoot);
+  }
+  if (!code || typeof code !== "string") {
+    logger.error("OAuth callback에 code 쿼리가 없음");
+    return res.redirect(302, frontRoot);
+  }
+
+  try {
+    logger.info("인가 코드로 토큰 교환 시도");
+    const tokens = await exchangeCodeForTokens(code);
+    logger.info("토큰 교환 성공", { hasAccessToken: !!tokens.access_token });
+
+    const googleUser = await getUserInfo(tokens.access_token);
+    const user = await findOrCreateGoogleUser(googleUser);
+    const session = await issueSession(user);
+
+    logger.info("Google 사용자 정보 조회 성공", {
+      userId: user.id,
+      email: user.email,
+      profile_image_url: user.profile_image_url,
+    });
+
+    setAuthCookies(res, session);
+
+    logger.info("세션 발급/쿠키 설정 완료, 프론트로 리다이렉트", {
+      redirectTo: frontRoot,
+    });
+    res.redirect(302, frontRoot);
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error("Unknown callback error");
+    logger.error("Auth callback 처리 중 에러", {
+      message: error.message,
+      stack: error.stack,
+    });
+    res.redirect(302, frontRoot);
+  }
+}
 export async function me(req: Request, res: Response) {
   const user = res.locals.user ?? null;
   logger.info("신원 확인:", { email: user?.email });
@@ -60,20 +152,7 @@ export async function refresh(req: Request, res: Response) {
 
   if (!result.ok) {
     // 침해 의심 시 쿠키 즉시 정리
-    res.clearCookie("access_token", {
-      httpOnly: true,
-      secure: accessCookieOptions().secure,
-      sameSite: accessCookieOptions().sameSite,
-      domain: accessCookieOptions().domain,
-      path: accessCookieOptions().path,
-    });
-    res.clearCookie("refresh_token", {
-      httpOnly: true,
-      secure: refreshCookieOptions().secure,
-      sameSite: refreshCookieOptions().sameSite,
-      domain: refreshCookieOptions().domain,
-      path: refreshCookieOptions().path,
-    });
+    clearAuthCookies(res);
     return res.status(401).json({
       error:
         result.code === "REUSE_DETECTED"
@@ -83,8 +162,7 @@ export async function refresh(req: Request, res: Response) {
   }
 
   // rotate 성공: 신규 access/refresh 재쿠키 세팅
-  res.cookie("access_token", result.accessToken, accessCookieOptions());
-  res.cookie("refresh_token", result.refreshToken, refreshCookieOptions());
+  setAuthCookies(res, result);
   logger.info("토큰 재발급 성공");
   return res.status(200).json({ message: "토큰이 재발급되었습니다." });
 }
@@ -93,23 +171,8 @@ export async function logout(req: Request, res: Response) {
   // 1) refresh 폐기 로직이 있다면 여기서 수행
   // 예: await revokeRefreshToken(...)
 
-  // 2) access 쿠키 삭제 (로그인 시와 동일한 path/domain/sameSite/secure를 맞춰야 삭제됨)
-  res.clearCookie("access_token", {
-    httpOnly: true,
-    secure: accessCookieOptions().secure,
-    sameSite: accessCookieOptions().sameSite,
-    domain: accessCookieOptions().domain,
-    path: accessCookieOptions().path,
-  });
-
-  // 3) refresh 쿠키 삭제 (path가 /auth/refresh 이므로 반드시 동일하게 맞춰야 함)
-  res.clearCookie("refresh_token", {
-    httpOnly: true,
-    secure: refreshCookieOptions().secure,
-    sameSite: refreshCookieOptions().sameSite,
-    domain: refreshCookieOptions().domain,
-    path: refreshCookieOptions().path,
-  });
+  // 2) access/refresh 쿠키 삭제
+  clearAuthCookies(res);
 
   logger.info("유저 로그아웃");
   return res.status(200).json({ message: "로그아웃에 성공했습니다." });

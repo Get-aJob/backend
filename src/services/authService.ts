@@ -6,6 +6,13 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from "../lib/jwt";
+import { logger } from "../utils/logger";
+import type { IGoogleToken, IGoogleUser } from "../types/google";
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const BASE_URL = process.env.BASE_URL;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3009";
 
 function sha256(input: string) {
   return crypto.createHash("sha256").update(input).digest("hex");
@@ -154,6 +161,44 @@ export async function registerUser({
   return data;
 }
 
+type SessionUser = {
+  id: string;
+  email: string;
+  profile_image_url: string | null;
+};
+
+export async function issueSession(user: SessionUser) {
+  const accessToken = signAccessToken({
+    id: user.id,
+    email: user.email,
+    profile_image_url: user.profile_image_url,
+  });
+
+  const refreshToken = signRefreshToken({
+    id: user.id,
+    email: user.email,
+    profile_image_url: user.profile_image_url,
+  });
+
+  const refreshTokenHash = sha256(refreshToken);
+
+  const { error: rtError } = await supabase.from("refresh_tokens").insert({
+    user_id: user.id,
+    token_hash: refreshTokenHash,
+    expires_at: calcRefreshExpiryDate(),
+    revoked_at: null,
+  });
+
+  if (rtError) {
+    throw new Error(rtError.message);
+  }
+
+  return {
+    accessToken,
+    refreshToken,
+  };
+}
+
 export async function loginUser({
   email,
   password,
@@ -179,35 +224,12 @@ export async function loginUser({
     return { ok: false as const };
   }
 
-  // 3) 토큰 발급
-  const accessToken = signAccessToken({
+  // 3) 공통 세션 발급 (email/google 로그인 공통 경로)
+  const { accessToken, refreshToken } = await issueSession({
     id: user.id,
     email: user.email,
     profile_image_url: user.profile_image_url,
   });
-
-  const refreshToken = signRefreshToken({
-    id: user.id,
-    email: user.email,
-    profile_image_url: user.profile_image_url,
-  });
-
-  // 4) refresh token DB 저장 (해시된 토큰으로 저장해야 DB가 털려도 원문이 없음)
-  const refreshTokenHash = sha256(refreshToken);
-
-  const expiresAt = new Date();
-  // JWT_REFRESH_EXPIRES_IN을 파싱해도 되지만, 우선 고정
-  expiresAt.setDate(expiresAt.getDate() + 14);
-
-  const { error: rtError } = await supabase.from("refresh_tokens").insert({
-    user_id: user.id,
-    token_hash: refreshTokenHash,
-    expires_at: expiresAt.toISOString(),
-  });
-
-  if (rtError) {
-    throw new Error(rtError.message);
-  }
 
   return {
     ok: true as const,
@@ -290,4 +312,221 @@ export async function confirmPasswordResetService(params: {
   // 1회용 토큰
   resetSessionStore.delete(resetToken);
   return { ok: true as const };
+}
+
+/**
+ * Google 관련 로직
+ */
+
+function isConfigured() {
+  return !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+}
+
+export function getConsentUrl() {
+  if (!isConfigured()) return null;
+
+  const redirectUrl = `${BASE_URL}/auth/callback`;
+
+  logger.debug("Google OAuth 동의 URL 생성", {
+    BASE_URL,
+    redirectUrl,
+  });
+
+  const SCOPES = ["openid", "email", "profile"];
+
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID as string,
+    redirect_uri: redirectUrl,
+    response_type: "code",
+    scope: SCOPES.join(" "),
+    access_type: "offline",
+    prompt: "consent",
+  });
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+export function getFrontendUrl(path = "") {
+  const base = FRONTEND_URL.replace(/\/$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+}
+
+function isGoogleToken(value: unknown): value is IGoogleToken {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  const hasValidRefreshToken =
+    !("refresh_token" in v) || typeof v.refresh_token === "string";
+  return (
+    typeof v.access_token === "string" &&
+    typeof v.expires_in === "number" &&
+    hasValidRefreshToken &&
+    typeof v.scope === "string" &&
+    typeof v.token_type === "string" &&
+    typeof v.id_token === "string"
+  );
+}
+/**
+ * 인가 코드로 액세스 토큰 교환
+ */
+export async function exchangeCodeForTokens(
+  code: string,
+): Promise<IGoogleToken> {
+  const redirectUrl = `${BASE_URL}/auth/callback`;
+
+  logger.info("Google 토큰 엔드포인트 호출 시도", { redirectUrl });
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: GOOGLE_CLIENT_ID as string,
+      client_secret: GOOGLE_CLIENT_SECRET as string,
+      redirect_uri: redirectUrl,
+      grant_type: "authorization_code",
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    logger.error("Token exchange failed", { status: res.status, body: err });
+    throw new Error(`Token exchange failed: ${err}`);
+  }
+
+  logger.info("Token exchange 성공");
+
+  const data: unknown = await res.json();
+
+  if (!isGoogleToken(data)) {
+    throw new Error("Invalid Google token response shape");
+  }
+
+  return data;
+}
+
+function isGoogleUserInfo(
+  value: unknown,
+): value is {
+  id: string;
+  email: string;
+  name?: string;
+  picture?: string;
+} {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  const hasValidName = !("name" in v) || typeof v.name === "string";
+  const hasValidPicture = !("picture" in v) || typeof v.picture === "string";
+  return (
+    typeof v.id === "string" &&
+    typeof v.email === "string" &&
+    hasValidName &&
+    hasValidPicture
+  );
+}
+
+/**
+ * 액세스 토큰으로 사용자 정보 조회
+ */
+export async function getUserInfo(accessToken: string): Promise<IGoogleUser> {
+  logger.info("Google 사용자 정보 조회 시도");
+  const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    logger.error("Failed to fetch user info", { status: res.status, body: err });
+    throw new Error("Failed to fetch user info");
+  }
+  const data: unknown = await res.json();
+  if (!isGoogleUserInfo(data)) {
+    throw new Error("Invalid Google user info response shape");
+  }
+  logger.info("Google 사용자 정보 조회 성공", {
+    userId: data.id,
+    email: data.email,
+  });
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name || null,
+    picture: data.picture || null,
+  };
+}
+
+export async function findOrCreateGoogleUser(
+  googleUser: IGoogleUser,
+): Promise<SessionUser> {
+  const normalizedEmail = googleUser.email.trim().toLowerCase();
+
+  const { data: existingUser, error: selectError } = await supabase
+    .from("users")
+    .select("id, email, name, profile_image_url")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (selectError) {
+    throw new Error(selectError.message);
+  }
+
+  if (existingUser) {
+    const updatePayload: { name?: string; profile_image_url?: string | null } = {};
+
+    if (googleUser.name && googleUser.name !== existingUser.name) {
+      updatePayload.name = googleUser.name;
+    }
+    if (googleUser.picture && googleUser.picture !== existingUser.profile_image_url) {
+      updatePayload.profile_image_url = googleUser.picture;
+    }
+
+    if (Object.keys(updatePayload).length > 0) {
+      const { data: updatedUser, error: updateError } = await supabase
+        .from("users")
+        .update(updatePayload)
+        .eq("id", existingUser.id)
+        .select("id, email, profile_image_url")
+        .single();
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+
+      return {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        profile_image_url: updatedUser.profile_image_url,
+      };
+    }
+
+    return {
+      id: existingUser.id,
+      email: existingUser.email,
+      profile_image_url: existingUser.profile_image_url,
+    };
+  }
+
+  const randomPassword = crypto.randomBytes(32).toString("hex");
+  const passwordHash = await bcrypt.hash(randomPassword, 12);
+  const fallbackName = normalizedEmail.split("@")[0] || "google-user";
+
+  const { data: createdUser, error: insertError } = await supabase
+    .from("users")
+    .insert({
+      email: normalizedEmail,
+      password_hash: passwordHash,
+      name: googleUser.name ?? fallbackName,
+      profile_image_url: googleUser.picture,
+    })
+    .select("id, email, profile_image_url")
+    .single();
+
+  if (insertError) {
+    throw new Error(insertError.message);
+  }
+
+  return {
+    id: createdUser.id,
+    email: createdUser.email,
+    profile_image_url: createdUser.profile_image_url,
+  };
 }
