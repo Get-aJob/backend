@@ -61,7 +61,7 @@ export async function getScrapsByUser(
 
     let query = supabase
         .from(TABLE_NAME)
-        .select('*, job_postings(title, content, company_name, company_logo, deadline, location, experience, content)')
+        .select('*, job_postings(title, content, company_name, company_logo, deadline, location, experience)')
         .eq('user_id', userId);
 
     if (sortBy === 'deadline') {
@@ -78,11 +78,12 @@ export async function getScrapsByUser(
     }
 
     const { data, error} = await query.range(offset, offset + limit - 1);
-    const convertedData = convertKeysToCamel<any[]>(data ?? []);
 
     if (error) {
         throwSupabaseError(error);
     }
+
+    const convertedData = convertKeysToCamel<any[]>(data ?? []);
 
     const postingIds = convertedData
         .map((row: any) => row?.jobPostingId)
