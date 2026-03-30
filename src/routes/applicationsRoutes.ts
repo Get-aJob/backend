@@ -35,7 +35,7 @@ const router = Router();
  *         schema:
  *           type: integer
  *           default: 0
- *         description: 시작 위치(무한 스크롤 다음 요청 시 nextOffset 사용)
+ *         description: 시작 위치
  *     responses:
  *       200:
  *         description: 지원 목록 조회 성공
@@ -253,7 +253,7 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *         notes:
  *           type: string
  *           description: 메모
- *         status:
+ *         statusName:
  *           type: string
  *           nullable: true
  *           description: 지원 상태명
@@ -263,40 +263,25 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *           description: 연관 채용공고 정보
  *         histories:
  *           type: array
- *           description: 지원 상태 변경 히스토리 목록
+ *           description: 지원 상태 변경 이력 목록
  *           items:
  *             type: object
  *             properties:
- *               id:
- *                 type: string
- *               fromStatusId:
- *                 type: string
- *                 nullable: true
  *               toStatusId:
  *                 type: string
- *               toStatusName:
- *                 type: string
  *                 nullable: true
- *                 description: toStatusId에 해당하는 진행 상태명(display_name)
- *               changedByUserId:
+ *               toStatusName:
  *                 type: string
  *                 nullable: true
  *               changedAt:
  *                 type: string
- *                 format: date
- *                 example: 2026-03-27
+ *                 format: date-time
+ *                 nullable: true
  *     ApplicationResponse:
  *       type: object
  *       properties:
  *         application:
  *           $ref: '#/components/schemas/Application'
- *     ApplicationsResponse:
- *       type: object
- *       properties:
- *         applications:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/Application'
  *     ApplicationsByUserResponse:
  *       type: object
  *       properties:
@@ -309,31 +294,29 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *           properties:
  *             totalCount:
  *               type: integer
- *               example: 123
  *             hasNext:
  *               type: boolean
- *               example: true
  *             nextOffset:
  *               type: integer
  *               nullable: true
- *               example: 20
  *             limit:
  *               type: integer
- *               example: 20
  *             offset:
  *               type: integer
- *               example: 0
  *     ApplicationStatus:
  *       type: object
  *       properties:
  *         id:
  *           type: string
- *         display_name:
+ *         displayName:
  *           type: string
- *         is_active:
+ *           description: 지원 상태명
+ *         isActive:
  *           type: boolean
- *         display_order:
+ *           description: 활성화 여부
+ *         displayOrder:
  *           type: number
+ *           description: 표시 순서
  *     ApplicationStatusesResponse:
  *       type: object
  *       properties:
