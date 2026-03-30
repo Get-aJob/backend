@@ -168,7 +168,7 @@ export async function createApplication(application: Record<string, unknown>, st
     }
   }
 
-  return data ?? [];
+  return getApplicationById(data.id);
 }
 
 export async function updateApplication(id: string, updates: Record<string, unknown>, statusId?: string, changedByUserId?: string) {
@@ -244,7 +244,7 @@ export async function updateApplication(id: string, updates: Record<string, unkn
     }
   }
 
-  return data ?? [];
+  return getApplicationById(data.id);
 }
 
 export async function deleteApplication(id: string) {
