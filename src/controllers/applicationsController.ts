@@ -97,6 +97,9 @@ export async function listApplicationsByUser(req: AuthRequest, res: Response<any
 export async function getApplication(req: AuthRequest, res: Response<any, AuthLocals>) {
   try {
     const id = String(req.params.id);
+    if (!isUuid(id)) {
+      return res.status(400).json({ error: 'id 값이 UUID 형식이 아닙니다.' });
+    }
     const authUserId = getAuthUserId(req, res);
     if (!authUserId) {
       return res.status(401).json({ error: '권한이 없습니다.' });
@@ -203,6 +206,9 @@ export async function updateApplicationHandler(req: AuthRequest, res: Response<a
 export async function deleteApplicationHandler(req: AuthRequest, res: Response<any, AuthLocals>) {
   try {
     const id = String(req.params.id);
+    if (!isUuid(id)) {
+      return res.status(400).json({ error: 'id 값이 UUID 형식이 아닙니다.' });
+    }
     const userId = getAuthUserId(req, res);
 
     const existing = await getApplicationById(id);

@@ -201,6 +201,10 @@ export async function updateApplication(id: string, updates: Record<string, unkn
     return null;
   }
 
+  if (!hasApplicationFieldUpdates && !hasStatusChanged) {
+    return data;
+  }
+
   if (hasStatusChanged) {
     try {
       await insertStatusHistory(id, statusId, changedByUserId, fromStatusId);
