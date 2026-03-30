@@ -150,12 +150,25 @@ export async function createApplication(application: Record<string, unknown>, st
       await insertStatusHistory(data.id, statusId, (application.user_id ?? application.userId) as string);
     } catch (err) {
       // 상태 이력 저장 실패 시 생성된 지원 데이터도 롤백
-      await supabase.from(TABLE_NAME).delete().eq('id', data.id);
+      const { error: rollbackError } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .eq('id', data.id);
+
+      if (rollbackError) {
+        const rollbackFailure = new Error(
+          `상태 이력 저장 실패 후 생성 롤백도 실패했습니다: ${rollbackError.message}`
+        ) as Error & { code?: string; cause?: unknown };
+        rollbackFailure.code = rollbackError.code;
+        rollbackFailure.cause = err;
+        throw rollbackFailure;
+      }
+
       throw err;
     }
   }
 
-  return normalizeApplication(data);
+  return data ?? [];
 }
 
 export async function updateApplication(id: string, updates: Record<string, unknown>, statusId?: string, changedByUserId?: string) {
@@ -211,21 +224,42 @@ export async function updateApplication(id: string, updates: Record<string, unkn
     } catch (err) {
       // 상태 이력 저장 실패 시 수정된 내용을 원복
       if (hasApplicationFieldUpdates && originalData) {
-        await supabase
+        const { error: rollbackError } = await supabase
           .from(TABLE_NAME)
           .update(convertKeysToSnake(Object.fromEntries(
             Object.keys(updates).map(k => [k, (originalData as any)[k]])
           )))
           .eq('id', id);
+
+        if (rollbackError) {
+          const rollbackFailure = new Error(
+            `상태 이력 저장 실패 후 수정 롤백도 실패했습니다: ${rollbackError.message}`
+          ) as Error & { code?: string; cause?: unknown };
+          rollbackFailure.code = rollbackError.code;
+          rollbackFailure.cause = err;
+          throw rollbackFailure;
+        }
       }
       throw err;
     }
   }
 
-  return normalizeApplication(data);
+  return data ?? [];
 }
 
 export async function deleteApplication(id: string) {
+  // 보상 복구를 위해 이력 원본을 먼저 백업한다.
+  const { data: historyBackup, error: historyReadError } = await supabase
+    .from(STATUS_TABLE_NAME)
+    .select('*')
+    .eq('application_id', id);
+
+  if (historyReadError) {
+    const e = new Error(historyReadError.message) as Error & { code?: string };
+    e.code = historyReadError.code;
+    throw e;
+  }
+
   const { error: historyError } = await supabase
     .from(STATUS_TABLE_NAME)
     .delete()
@@ -244,6 +278,21 @@ export async function deleteApplication(id: string) {
     .maybeSingle();
 
   if (error) {
+    if ((historyBackup ?? []).length > 0) {
+      const { error: restoreError } = await supabase
+        .from(STATUS_TABLE_NAME)
+        .insert(historyBackup as Record<string, unknown>[]);
+
+      if (restoreError) {
+        const restoreFailure = new Error(
+          `지원 삭제 실패 후 이력 복구도 실패했습니다: ${restoreError.message}`
+        ) as Error & { code?: string; cause?: unknown };
+        restoreFailure.code = restoreError.code;
+        restoreFailure.cause = error;
+        throw restoreFailure;
+      }
+    }
+
     const e = new Error(error.message) as Error & { code?: string };
     e.code = error.code;
     throw e;
