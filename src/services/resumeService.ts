@@ -10,6 +10,7 @@ import {
   deletePortfolioFilesFromUrls,
   finalizePortfolioFile,
   generateSignedUrl,
+  copyPortfolioFile,
 } from "./portfolioService";
 import { Portfolio } from "../types/resume";
 
@@ -217,3 +218,67 @@ export async function deleteResume(
 
   return isDeleted;
 }
+
+export async function duplicateResume(
+  resumeId: string,
+  userId: string,
+): Promise<ResumeListResponse> {
+  const original = await getRawResumeById(resumeId, userId);
+  if (!original) {
+    throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
+  }
+
+  const content = { ...original.content };
+
+  const baseTitle = original.title;
+  const { data: existingResumes } = await supabase
+    .from("resumes")
+    .select("title")
+    .eq("user_id", userId)
+    .like("title", `${baseTitle}(%)`);
+
+  let nextNum = 1;
+  if (existingResumes && existingResumes.length > 0) {
+    const numbers = existingResumes
+      .map((r: { title: string }) => {
+        const match = r.title.match(/\((\d+)\)$/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .filter((n: number) => n > 0);
+    if (numbers.length > 0) {
+      nextNum = Math.max(...numbers) + 1;
+    }
+  }
+
+  const newTitle = `${baseTitle}(${nextNum})`;
+
+  if (content.portfolio) {
+    for (const p of content.portfolio) {
+      if (p.fileUrl) {
+        const copiedUrl = await copyPortfolioFile(userId, p.fileUrl);
+        if (copiedUrl) p.fileUrl = copiedUrl;
+      }
+    }
+  }
+
+  const { data: newResume, error: insertError } = await supabase
+    .from("resumes")
+    .insert({
+      user_id: userId,
+      title: newTitle,
+      content: JSON.stringify(content),
+    })
+    .select("id, title, created_at")
+    .single();
+
+  if (insertError) {
+    throw new Error(`이력서 복제 실패: ${insertError.message}`);
+  }
+
+  return {
+    id: newResume.id,
+    title: newResume.title,
+    createdAt: newResume.created_at,
+  };
+}
+

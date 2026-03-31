@@ -233,6 +233,33 @@ router.get("/:resumeId", resumeController.getResume);
 // 이력서 수정
 router.patch("/:resumeId", resumeController.updateResume);
 
+
+/**
+ * @swagger
+ * /resumes/{resumeId}/duplicate:
+ *   post:
+ *     summary: 이력서 복제
+ *     tags: [Resumes]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: resumeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       201:
+ *         description: 복제 성공
+ *       404:
+ *         description: 이력서를 찾을 수 없음
+ *       401:
+ *         description: 인증 실패
+ */
+// 이력서 복제
+router.post("/:resumeId/duplicate", resumeController.duplicateResume);
+
+
 /**
  * @swagger
  * /resumes/{resumeId}:
