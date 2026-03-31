@@ -62,6 +62,29 @@ export async function createResume(
   };
 }
 
+async function getRawResumeById(
+  resumeId: string,
+  userId: string,
+): Promise<ResumeRecord | null> {
+  const { data, error } = await supabase
+    .from("resumes")
+    .select("*")
+    .eq("id", resumeId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`이력서 조회 실패: ${error.message}`);
+  }
+
+  const content =
+    typeof data.content === "string" ? JSON.parse(data.content) : data.content;
+
+  return { ...data, content } as ResumeRecord;
+}
+
+
 export async function getResumesByUser(
   userId: string,
 ): Promise<ResumeListItem[]> {
@@ -82,36 +105,19 @@ export async function getResumeById(
   resumeId: string,
   userId: string,
 ): Promise<ResumeRecord | null> {
-  const { data, error } = await supabase
-    .from("resumes")
-    .select("*")
-    .eq("id", resumeId)
-    .eq("user_id", userId)
-    .single();
+  const record = await getRawResumeById(resumeId, userId);
+  if (!record) return null;
 
-  if (error) {
-    if (error.code === "PGRST116") {
-      return null;
-    }
-    throw new Error(`이력서 조회 실패: ${error.message}`);
-  }
-
-  const content =
-    typeof data.content === "string" ? JSON.parse(data.content) : data.content;
-
-    if (content.portfolio) {
-  for (const p of content.portfolio) {
-    if (p.fileUrl) {
-      const signedUrl = await generateSignedUrl(p.fileUrl);
-      if (signedUrl) p.fileUrl = signedUrl;
+  if (record.content.portfolio) {
+    for (const p of record.content.portfolio) {
+      if (p.fileUrl) {
+        const signedUrl = await generateSignedUrl(p.fileUrl);
+        if (signedUrl) p.fileUrl = signedUrl;
+      }
     }
   }
-}
 
-  return {
-    ...data,
-    content,
-  } as ResumeRecord;
+  return record;
 }
 
 export async function updateResume(
@@ -119,7 +125,7 @@ export async function updateResume(
   userId: string,
   updates: { title?: string; content?: Partial<ResumeContent> },
 ): Promise<{ id: string; title: string; updated_at: string } | null> {
-  const currentRecord = await getResumeById(resumeId, userId);
+  const currentRecord = await getRawResumeById(resumeId, userId);
   if (!currentRecord) {
     throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
   }
@@ -183,7 +189,7 @@ export async function deleteResume(
   resumeId: string,
   userId: string,
 ): Promise<boolean> {
-  const record = await getResumeById(resumeId, userId);
+  const record = await getRawResumeById(resumeId, userId);
 
   const { error, count } = await supabase
     .from("resumes")
