@@ -231,11 +231,14 @@ export async function duplicateResume(
   const content = JSON.parse(JSON.stringify(original.content));
 
   const baseTitle = original.title;
+  const escapedTitle = baseTitle
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
   const { data: existingResumes } = await supabase
     .from("resumes")
     .select("title")
     .eq("user_id", userId)
-    .like("title", `${baseTitle}(%)`);
+    .like("title", `${escapedTitle}(%)`);
 
   let nextNum = 1;
   if (existingResumes && existingResumes.length > 0) {
