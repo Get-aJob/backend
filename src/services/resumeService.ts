@@ -9,6 +9,7 @@ import { ConflictError, NotFoundError } from "../utils/errors";
 import {
   deletePortfolioFilesFromUrls,
   finalizePortfolioFile,
+  generateSignedUrl,
 } from "./portfolioService";
 import { Portfolio } from "../types/resume";
 
@@ -97,6 +98,15 @@ export async function getResumeById(
 
   const content =
     typeof data.content === "string" ? JSON.parse(data.content) : data.content;
+
+    if (content.portfolio) {
+  for (const p of content.portfolio) {
+    if (p.fileUrl) {
+      const signedUrl = await generateSignedUrl(p.fileUrl);
+      if (signedUrl) p.fileUrl = signedUrl;
+    }
+  }
+}
 
   return {
     ...data,
