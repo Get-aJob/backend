@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router } from 'express';
 import {
   join,
   login,
@@ -9,9 +9,10 @@ import {
   confirmPasswordReset,
   googleLogin,
   callback,
-} from "../controllers/authController";
-import { requireAuth } from "../middlewares/requireAuth";
-import { profileImageUploadSingle } from "../middlewares/upload";
+  googleCredentialLogin,
+} from '../controllers/authController';
+import { requireAuth } from '../middlewares/requireAuth';
+import { profileImageUploadSingle } from '../middlewares/upload';
 
 const router = Router();
 
@@ -115,7 +116,7 @@ const router = Router();
  *                   type: string
  *                   example: 필수 정보를 입력하지 않았습니다.
  */
-router.post("/join", profileImageUploadSingle, join);
+router.post('/join', profileImageUploadSingle, join);
 
 /**
  * @swagger
@@ -161,7 +162,7 @@ router.post("/join", profileImageUploadSingle, join);
  *                   type: string
  *                   example: UNAUTHORIZED
  */
-router.post("/login", login);
+router.post('/login', login);
 
 /**
  * @swagger
@@ -185,7 +186,7 @@ router.post("/login", login);
  *       401:
  *         description: 인증 실패
  */
-router.get("/me", requireAuth, me);
+router.get('/me', requireAuth, me);
 
 /**
  * @swagger
@@ -206,7 +207,7 @@ router.get("/me", requireAuth, me);
  *                   type: string
  *                   example: 로그아웃에 성공했습니다.
  */
-router.post("/logout", logout);
+router.post('/logout', logout);
 
 /**
  * @swagger
@@ -237,7 +238,7 @@ router.post("/logout", logout);
  *                   type: string
  *                   example: TOKEN_REUSE_DETECTED
  */
-router.post("/refresh", refresh);
+router.post('/refresh', refresh);
 
 /**
  * @swagger
@@ -260,7 +261,7 @@ router.post("/refresh", refresh);
  *                   type: string
  *                   example: SERVER ERROR
  */
-router.get("/google", googleLogin);
+router.get('/google', googleLogin);
 
 /**
  * @swagger
@@ -286,9 +287,45 @@ router.get("/google", googleLogin);
  *       302:
  *         description: 인증 처리 후 프론트 화면으로 리다이렉트
  */
-router.get("/callback", callback);
+router.get('/callback', callback);
 
-router.post("/password/reset", requestPasswordReset);
-router.put("/password/reset", confirmPasswordReset);
+/**
+ * @swagger
+ * /auth/google/credential:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Google credential(id_token) 로그인
+ *     description: 프론트에서 Google One Tap 또는 버튼으로 받은 credential(id_token)을 검증하고 로그인 처리합니다.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - credential
+ *             properties:
+ *               credential:
+ *                 type: string
+ *                 description: Google id_token
+ *     responses:
+ *       200:
+ *         description: 로그인 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/AuthUser'
+ *       400:
+ *         description: credential 누락
+ *       401:
+ *         description: 유효하지 않은 token
+ */
+router.post('/google/credential', googleCredentialLogin);
+
+router.post('/password/reset', requestPasswordReset);
+router.put('/password/reset', confirmPasswordReset);
 
 export default router;
