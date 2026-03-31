@@ -228,7 +228,7 @@ export async function duplicateResume(
     throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
   }
 
-  const content = { ...original.content };
+  const content = JSON.parse(JSON.stringify(original.content));
 
   const baseTitle = original.title;
   const { data: existingResumes } = await supabase
