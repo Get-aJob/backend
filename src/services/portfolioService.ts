@@ -64,10 +64,20 @@ export async function uploadPortfolioFile(params: {
 }
 
 function extractObjectPathFromUrl(url: string) {
-  const marker = `/storage/v1/object/public/${PORTFOLIO_BUCKET}/`;
-  const idx = url.indexOf(marker);
-  if (idx === -1) return null;
-  return url.slice(idx + marker.length);
+  const publicMarker = `/storage/v1/object/public/${PORTFOLIO_BUCKET}/`;
+  const publicIdx = url.indexOf(publicMarker);
+  if (publicIdx !== -1) {
+    return url.slice(publicIdx + publicMarker.length);
+  }
+
+  const signMarker = `/storage/v1/object/sign/${PORTFOLIO_BUCKET}/`;
+  const signIdx = url.indexOf(signMarker);
+  if (signIdx !== -1) {
+    const path = url.slice(signIdx + signMarker.length);
+    return path.split("?")[0];
+  }
+
+  return null;
 }
 
 export async function deletePortfolioFilesFromUrls(
