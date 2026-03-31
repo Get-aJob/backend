@@ -174,3 +174,18 @@ export async function finalizePortfolioFile(
   });
   return publicUrlData.publicUrl;
 }
+
+export async function generateSignedUrl(
+  storedFileUrl: string,
+  expiresIn = 3600, 
+): Promise<string | null> {
+  const objectPath = extractObjectPathFromUrl(storedFileUrl);
+  if (!objectPath) return null;
+
+  const { data, error } = await supabase.storage
+    .from(PORTFOLIO_BUCKET)
+    .createSignedUrl(objectPath, expiresIn);
+
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
