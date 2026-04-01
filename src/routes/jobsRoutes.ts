@@ -118,6 +118,52 @@ router.delete(
 /**
  * @swagger
  * /jobs/direct:
+ *   post:
+ *     summary: 직접 입력 공고 생성
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, companyName]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               companyName:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               experience:
+ *                 type: string
+ *               companyLogo:
+ *                 type: string
+ *               deadline:
+ *                 type: string
+ *                 format: date
+ *               deadlineText:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               sourceUrl:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: 공고 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ *       401:
+ *         description: 인증 필요
+ */
+router.post("/direct", requireAuth, createDirectJobHandler);
+
+
+/**
+ * @swagger
+ * /jobs/direct:
  *   get:
  *     summary: 내 직접 입력 공고 목록 조회
  *     tags: [Jobs]
@@ -287,52 +333,6 @@ router.get(
   optionalAuth,
   jobCommentsController.getJobComments,
 );
-
-/**
- * @swagger
- * /jobs/direct:
- *   post:
- *     summary: 직접 입력 공고 생성
- *     tags: [Jobs]
- *     security:
- *       - cookieAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [title, companyName]
- *             properties:
- *               title:
- *                 type: string
- *               companyName:
- *                 type: string
- *               location:
- *                 type: string
- *               experience:
- *                 type: string
- *               companyLogo:
- *                 type: string
- *               deadline:
- *                 type: string
- *                 format: date
- *               deadlineText:
- *                 type: string
- *               description:
- *                 type: string
- *               sourceUrl:
- *                 type: string
- *     responses:
- *       201:
- *         description: 공고 생성 성공
- *       400:
- *         description: 필수 항목 누락
- *       401:
- *         description: 인증 필요
- */
-router.post("/direct", requireAuth, createDirectJobHandler);
-
 
 
 export default router;
