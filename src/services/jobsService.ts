@@ -44,6 +44,11 @@ export async function crawlJob(url: string) {
 
     const crawledData = responseData.data as CrawledJob;
 
+    const externalId = String(crawledData.externalId || crawledData.external_id || "").trim();
+      if (!externalId) {
+        throw new Error('크롤링된 공고의 ID를 확인할 수 없습니다.');
+      }
+
     const rawDeadline = String(crawledData.deadline || "").trim();
     const { deadline, deadlineText } = parseDeadline(rawDeadline);
 
@@ -56,7 +61,7 @@ export async function crawlJob(url: string) {
       deadline,
       deadlineText,
       sourceUrl: crawledData.link || url,
-      externalId: String(crawledData.externalId || crawledData.external_id || ""),
+      externalId,
       content: crawledData,
     };
   } catch (error: any) {
