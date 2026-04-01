@@ -9,6 +9,7 @@ import {
   confirmPasswordReset,
   googleLogin,
   callback,
+  googleCredentialLogin,
 } from "../controllers/authController";
 import { requireAuth } from "../middlewares/requireAuth";
 import { profileImageUploadSingle } from "../middlewares/upload";
@@ -260,7 +261,7 @@ router.post("/refresh", refresh);
  *                   type: string
  *                   example: SERVER ERROR
  */
-router.get('/google', googleLogin);
+router.get("/google", googleLogin);
 
 /**
  * @swagger
@@ -286,7 +287,7 @@ router.get('/google', googleLogin);
  *       302:
  *         description: 인증 처리 후 프론트 화면으로 리다이렉트
  */
-router.get('/callback', callback);
+router.get("/callback", callback);
 
 /**
  * @swagger
@@ -322,9 +323,9 @@ router.get('/callback', callback);
  *       401:
  *         description: 유효하지 않은 token
  */
-router.post('/google/credential', googleCredentialLogin);
+router.post("/google/credential", googleCredentialLogin);
 
-router.post('/password/reset', requestPasswordReset);
-router.put('/password/reset', confirmPasswordReset);
+router.post("/password/reset", requestPasswordReset);
+router.put("/password/reset", confirmPasswordReset);
 
 export default router;
