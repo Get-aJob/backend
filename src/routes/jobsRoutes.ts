@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { optionalAuth } from "../middlewares/optionalAuth";
 import * as jobsController from "../controllers/jobsController";
+import * as jobCommentsController from "../controllers/jobCommentsController";
 
 const router = Router();
 
@@ -9,7 +10,7 @@ const router = Router();
  * @swagger
  * /jobs/manual:
  *   post:
- *     summary: 수동 채용 공고 크롤링
+ *     summary: ?�동 채용 공고 ?�롤�?
  *     tags: [Jobs]
  *     security:
  *       - cookieAuth: []
@@ -25,13 +26,13 @@ const router = Router();
  *                 description: 채용 공고 URL
  *     responses:
  *       201:
- *         description: 크롤링 및 저장 성공
+ *         description: ?�롤�?�??�???�공
  *       400:
- *         description: URL 누락
+ *         description: URL ?�락
  *       401:
- *         description: 인증 실패
+ *         description: ?�증 ?�패
  *       500:
- *         description: 서버 오류
+ *         description: ?�버 ?�류
  */
 router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
 
@@ -39,7 +40,7 @@ router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
  * @swagger
  * /jobs:
  *   get:
- *     summary: 채용 공고 조회 (자동/수동 필터링)
+ *     summary: 채용 공고 조회 (?�동/?�동 ?�터�?
  *     tags: [Jobs]
  *     security:
  *       - cookieAuth: []
@@ -47,7 +48,7 @@ router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
  *       - in: query
  *         name: sourceType
  *         required: true
- *         description: 공고 출처 필터 (auto, manual)
+ *         description: 공고 출처 ?�터 (auto, manual)
  *         schema:
  *           type: string
  *           enum: [auto, manual]
@@ -63,13 +64,13 @@ router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
  *           default: 0
  *     responses:
  *       200:
- *         description: 조회 성공
+ *         description: 조회 ?�공
  *       400:
- *         description: 잘못된 요청 (sourceType 누락 등)
+ *         description: ?�못???�청 (sourceType ?�락 ??
  *       401:
- *         description: 인증 실패
+ *         description: ?�증 ?�패
  *       500:
- *         description: 서버 오류
+ *         description: ?�버 ?�류
  */
 router.get("/", optionalAuth, jobsController.getJobsHandler);
 
@@ -77,8 +78,8 @@ router.get("/", optionalAuth, jobsController.getJobsHandler);
  * @swagger
  * /jobs/manual/{externalId}:
  *   delete:
- *     summary: 수동 채용 공고 삭제
- *     description: 본인이 등록한 수동 공고를 externalId로 삭제합니다. source_type=manual + external_id + created_by(userId) 3중 검증으로 본인 공고만 삭제 가능합니다.
+ *     summary: ?�동 채용 공고 ??��
+ *     description: 본인???�록???�동 공고�?externalId�???��?�니?? source_type=manual + external_id + created_by(userId) 3�?검증으�?본인 공고�???�� 가?�합?�다.
  *     tags: [Jobs]
  *     security:
  *       - cookieAuth: []
@@ -86,21 +87,100 @@ router.get("/", optionalAuth, jobsController.getJobsHandler);
  *       - in: path
  *         name: externalId
  *         required: true
- *         description: 삭제할 공고의 external_id
+ *         description: ??��??공고??external_id
  *         schema:
  *           type: string
  *     responses:
  *       204:
- *         description: 삭제 성공 (응답 본문 없음)
+ *         description: ??�� ?�공 (?�답 본문 ?�음)
  *       400:
- *         description: externalId 누락
+ *         description: externalId ?�락
  *       401:
- *         description: 인증 실패
+ *         description: ?�증 ?�패
  *       404:
- *         description: 해당 공고 없음 또는 삭제 권한 없음
+ *         description: ?�당 공고 ?�음 ?�는 ??�� 권한 ?�음
  *       500:
- *         description: 서버 오류
+ *         description: ?�버 ?�류
  */
-router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJobHandler);
+router.delete(
+  "/manual/:externalId",
+  requireAuth,
+  jobsController.deleteManualJobHandler,
+);
+
+/**
+ * @swagger
+ * /jobs/{jobId}/comments:
+ *   post:
+ *     summary: 공고 ?��? ?�성
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: ?�성 ?�공
+ *       400:
+ *         description: jobId ?�식 ?�류 ?�는 content ?�락/공백
+ *       401:
+ *         description: ?�증 ?�요
+ *       404:
+ *         description: 공고 ?�음
+ *       500:
+ *         description: ?�버 ?�류
+ */
+router.post(
+  "/:jobId/comments",
+  requireAuth,
+  jobCommentsController.createJobCommentHandler,
+);
+
+/**
+ * @swagger
+ * /jobs/{jobId}/comments:
+ *   get:
+ *     summary: 공고 ?��? 목록
+ *     description: 비로그인??조회 가?�합?�다(쿠키 ?�택).
+ *     tags: [Jobs]
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *     responses:
+ *       200:
+ *         description: 조회 ?�공
+ *       400:
+ *         description: jobId ?�식 ?�류
+ *       404:
+ *         description: 공고 ?�음
+ *       500:
+ *         description: ?�버 ?�류
+ */
+router.get(
+  "/:jobId/comments",
+  optionalAuth,
+  jobCommentsController.getJobComments,
+);
 
 export default router;
