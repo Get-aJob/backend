@@ -13,7 +13,7 @@ const BASE_URL = process.env.BASE_URL;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3009';
 
 function sha256(input: string) {
-  return crypto.createHash('sha256').update(input).digest('hex');
+  return crypto.createHash("sha256").update(input).digest("hex");
 }
 
 function calcRefreshExpiryDate() {
@@ -27,34 +27,34 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   try {
     payload = verifyRefreshToken(rawRefreshToken);
   } catch (error) {
-    return { ok: false as const, code: 'UNAUTHORIZED' as const };
+    return { ok: false as const, code: "UNAUTHORIZED" as const };
   }
 
   const tokenHash = sha256(rawRefreshToken);
 
   const { data: current, error } = await supabase
-    .from('refresh_tokens')
-    .select('user_id, token_hash, expires_at, revoked_at')
-    .eq('token_hash', tokenHash)
+    .from("refresh_tokens")
+    .select("user_id, token_hash, expires_at, revoked_at")
+    .eq("token_hash", tokenHash)
     .single();
 
   if (error || !current) {
     await supabase
-      .from('refresh_tokens')
+      .from("refresh_tokens")
       .update({ revoked_at: new Date().toISOString() })
-      .eq('user_id', payload.id)
-      .is('revoked_at', null);
+      .eq("user_id", payload.id)
+      .is("revoked_at", null);
 
-    return { ok: false as const, code: 'REUSE_DETECTED' as const };
+    return { ok: false as const, code: "REUSE_DETECTED" as const };
   }
 
   if (current.revoked_at || new Date(current.expires_at).getTime() < Date.now()) {
     await supabase
-      .from('refresh_tokens')
+      .from("refresh_tokens")
       .update({ revoked_at: new Date().toISOString() })
-      .eq('user_id', current.user_id)
-      .is('revoked_at', null);
-    return { ok: false as const, code: 'REUSE_DETECTED' as const };
+      .eq("user_id", current.user_id)
+      .is("revoked_at", null);
+    return { ok: false as const, code: "REUSE_DETECTED" as const };
   }
 
   const newAccessToken = signAccessToken({
@@ -72,10 +72,10 @@ export async function rotateRefreshToken(rawRefreshToken: string) {
   const nowIso = new Date().toISOString();
 
   const { error: revokeErr } = await supabase
-    .from('refresh_tokens')
+    .from("refresh_tokens")
     .update({ revoked_at: nowIso })
-    .eq('token_hash', tokenHash)
-    .is('revoked_at', null);
+    .eq("token_hash", tokenHash)
+    .is("revoked_at", null);
   if (revokeErr) throw new Error(revokeErr.message);
 
   const { error: insertErr } = await supabase.from('refresh_tokens').insert({
@@ -107,13 +107,13 @@ export async function registerUser({
   const passwordHash = await bcrypt.hash(password, 12);
 
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .insert({
       email: email,
       password_hash: passwordHash,
       name: name,
     })
-    .select('id, email, name, created_at')
+    .select("id, email, name, created_at")
     .single();
 
   if (error) {
@@ -128,7 +128,7 @@ export async function registerUser({
         contentType: file.mimetype,
       });
     } catch (uploadError) {
-      console.error('프로필 이미지 업로드 실패:', uploadError);
+      console.error("프로필 이미지 업로드 실패:", uploadError);
     }
   }
 
@@ -176,9 +176,9 @@ export async function issueSession(user: SessionUser) {
 
 export async function loginUser({ email, password }: { email: string; password: string }) {
   const { data: user, error } = await supabase
-    .from('users')
-    .select('id, email, password_hash, name, profile_image_url')
-    .eq('email', email)
+    .from("users")
+    .select("id, email, password_hash, name, profile_image_url")
+    .eq("email", email)
     .single();
 
   if (error || !user) {
@@ -212,21 +212,24 @@ export async function loginUser({ email, password }: { email: string; password: 
 const resetSessionStore = new Map<string, { userId: string; expiresAt: number }>();
 
 function generateResetToken() {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
-export async function requestPasswordResetService(params: { email: string; name: string }) {
+export async function requestPasswordResetService(params: {
+  email: string;
+  name: string;
+}) {
   const { email, name } = params;
 
   const { data: user, error } = await supabase
-    .from('users')
-    .select('id, email, name')
-    .eq('email', email)
-    .eq('name', name)
+    .from("users")
+    .select("id, email, name")
+    .eq("email", email)
+    .eq("name", name)
     .single();
 
   if (error || !user) {
-    return { ok: false as const, code: 'USER_NOT_FOUND' as const };
+    return { ok: false as const, code: "USER_NOT_FOUND" as const };
   }
 
   const resetToken = generateResetToken();
@@ -251,20 +254,20 @@ export async function confirmPasswordResetService(params: {
 
   const session = resetSessionStore.get(resetToken);
   if (!session) {
-    return { ok: false as const, code: 'INVALID_RESET_TOKEN' as const };
+    return { ok: false as const, code: "INVALID_RESET_TOKEN" as const };
   }
 
   if (session.expiresAt < Date.now()) {
     resetSessionStore.delete(resetToken);
-    return { ok: false as const, code: 'RESET_TOKEN_EXPIRED' as const };
+    return { ok: false as const, code: "RESET_TOKEN_EXPIRED" as const };
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   const { error } = await supabase
-    .from('users')
+    .from("users")
     .update({ password_hash: passwordHash })
-    .eq('id', session.userId);
+    .eq("id", session.userId);
   if (error) {
     throw new Error(error.message);
   }
@@ -441,12 +444,16 @@ export async function findOrCreateGoogleUser(googleUser: IGoogleUser): Promise<S
   }
 
   if (existingUser) {
-    const updatePayload: { name?: string; profile_image_url?: string | null } = {};
+    const updatePayload: { name?: string; profile_image_url?: string | null } =
+      {};
 
     if (googleUser.name && googleUser.name !== existingUser.name) {
       updatePayload.name = googleUser.name;
     }
-    if (googleUser.picture && googleUser.picture !== existingUser.profile_image_url) {
+    if (
+      googleUser.picture &&
+      googleUser.picture !== existingUser.profile_image_url
+    ) {
       updatePayload.profile_image_url = googleUser.picture;
     }
 

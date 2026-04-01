@@ -9,6 +9,7 @@ import {
   deleteDirectJobHandler,
 } from "../controllers/jobsController";
 
+import * as jobCommentsController from "../controllers/jobCommentsController";
 
 const router = Router();
 
@@ -108,7 +109,86 @@ router.get("/", optionalAuth, jobsController.getJobsHandler);
  *       500:
  *         description: 서버 오류
  */
-router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJobHandler);
+router.delete(
+  "/manual/:externalId",
+  requireAuth,
+  jobsController.deleteManualJobHandler,
+);
+
+/**
+ * @swagger
+ * /jobs/{jobId}/comments:
+ *   post:
+ *     summary: 공고 댓글 작성
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: 작성 성공
+ *       400:
+ *         description: jobId 형식 오류 또는 content 누락/공백
+ *       401:
+ *         description: 인증 필요
+ *       404:
+ *         description: 공고 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.post(
+  "/:jobId/comments",
+  requireAuth,
+  jobCommentsController.createJobCommentHandler,
+);
+
+/**
+ * @swagger
+ * /jobs/{jobId}/comments:
+ *   get:
+ *     summary: 공고 댓글 목록
+ *     description: 비로그인도 조회 가능합니다(쿠키 선택).
+ *     tags: [Jobs]
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *       400:
+ *         description: jobId 형식 오류
+ *       404:
+ *         description: 공고 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.get(
+  "/:jobId/comments",
+  optionalAuth,
+  jobCommentsController.getJobComments,
+);
 
 /**
  * @swagger

@@ -199,3 +199,56 @@ export async function generateSignedUrl(
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }
+
+export async function copyPortfolioFile(
+  userId: string,
+  sourceFileUrl: string,
+): Promise<string | null> {
+  const objectPath = extractObjectPathFromUrl(sourceFileUrl);
+  if (!objectPath) return null;
+
+  const userPrefix = `users/${userId}/`;
+  if (!objectPath.startsWith(userPrefix)) {
+    logger.warn("타인의 포트폴리오 파일 복사 시도가 차단됨", {
+      userId,
+      objectPath,
+    });
+    return null;
+  }
+
+  const extension = objectPath.split(".").pop() || "pdf";
+  const rand = crypto.randomBytes(4).toString("hex");
+  const newPath = `users/${userId}/portfolio-${Date.now()}-${rand}.${extension}`;
+
+  logger.info("포트폴리오 파일 복사 시작", {
+    userId,
+    from: objectPath,
+    to: newPath,
+  });
+
+  const { error } = await supabase.storage
+    .from(PORTFOLIO_BUCKET)
+    .copy(objectPath, newPath);
+
+  if (error) {
+    logger.error("포트폴리오 파일 복사 실패", {
+      userId,
+      from: objectPath,
+      to: newPath,
+      error: error.message,
+    });
+    return null;
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from(PORTFOLIO_BUCKET)
+    .getPublicUrl(newPath);
+
+  logger.info("포트폴리오 파일 복사 성공", {
+    userId,
+    from: objectPath,
+    to: newPath,
+  });
+
+  return publicUrlData.publicUrl;
+}

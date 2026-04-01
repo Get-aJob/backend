@@ -146,3 +146,26 @@ export async function deleteResume(req: Request, res: Response): Promise<void> {
     res.status(500).json({ error: "이력서 삭제에 실패했습니다." });
   }
 }
+
+// 이력서 복제
+export async function duplicateResume(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const resumeId = req.params.resumeId as string;
+    const userId = res.locals.user.id;
+
+    const response = await resumeService.duplicateResume(resumeId, userId);
+
+    res.status(201).json(response);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    console.error("이력서 복제 오류:", err);
+    res.status(500).json({ error: "이력서 복제에 실패했습니다." });
+  }
+}
+
