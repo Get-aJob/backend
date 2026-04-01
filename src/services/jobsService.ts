@@ -9,6 +9,8 @@ export interface CrawledJob {
   company: string;
   location?: string;
   link?: string;
+  requirements?: string; 
+  preferred?: string;    
   [key: string]: any;
 }
 
@@ -52,6 +54,10 @@ export async function crawlJob(url: string) {
     const rawDeadline = String(crawledData.deadline || "").trim();
     const { deadline, deadlineText } = parseDeadline(rawDeadline);
 
+    const contentParts: string[] = [];
+    if (crawledData.requirements) contentParts.push(`[지원자격]\n${crawledData.requirements}`);
+    if (crawledData.preferred) contentParts.push(`[우대사항]\n${crawledData.preferred}`);
+
     return {
       title: crawledData.title,
       companyName: crawledData.company,
@@ -94,7 +100,7 @@ export async function saveManualJob(
       experience: data.experience || null,
       deadline: data.deadline || null,
       deadline_text: data.deadlineText || null,
-      content: JSON.stringify(data.content || {}),
+      content: data.content || null,
       source_type: "manual",
       created_by: userId,
       source_url: data.sourceUrl,
