@@ -9,6 +9,8 @@ import { ConflictError, NotFoundError } from "../utils/errors";
 import {
   deletePortfolioFilesFromUrls,
   finalizePortfolioFile,
+  generateSignedUrl,
+  copyPortfolioFile,
 } from "./portfolioService";
 import { Portfolio } from "../types/resume";
 
@@ -61,6 +63,29 @@ export async function createResume(
   };
 }
 
+async function getRawResumeById(
+  resumeId: string,
+  userId: string,
+): Promise<ResumeRecord | null> {
+  const { data, error } = await supabase
+    .from("resumes")
+    .select("*")
+    .eq("id", resumeId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`이력서 조회 실패: ${error.message}`);
+  }
+
+  const content =
+    typeof data.content === "string" ? JSON.parse(data.content) : data.content;
+
+  return { ...data, content } as ResumeRecord;
+}
+
+
 export async function getResumesByUser(
   userId: string,
 ): Promise<ResumeListItem[]> {
@@ -81,27 +106,19 @@ export async function getResumeById(
   resumeId: string,
   userId: string,
 ): Promise<ResumeRecord | null> {
-  const { data, error } = await supabase
-    .from("resumes")
-    .select("*")
-    .eq("id", resumeId)
-    .eq("user_id", userId)
-    .single();
+  const record = await getRawResumeById(resumeId, userId);
+  if (!record) return null;
 
-  if (error) {
-    if (error.code === "PGRST116") {
-      return null;
+  if (record.content.portfolio) {
+    for (const p of record.content.portfolio) {
+      if (p.fileUrl) {
+        const signedUrl = await generateSignedUrl(p.fileUrl);
+        if (signedUrl) p.fileUrl = signedUrl;
+      }
     }
-    throw new Error(`이력서 조회 실패: ${error.message}`);
   }
 
-  const content =
-    typeof data.content === "string" ? JSON.parse(data.content) : data.content;
-
-  return {
-    ...data,
-    content,
-  } as ResumeRecord;
+  return record;
 }
 
 export async function updateResume(
@@ -109,7 +126,7 @@ export async function updateResume(
   userId: string,
   updates: { title?: string; content?: Partial<ResumeContent> },
 ): Promise<{ id: string; title: string; updated_at: string } | null> {
-  const currentRecord = await getResumeById(resumeId, userId);
+  const currentRecord = await getRawResumeById(resumeId, userId);
   if (!currentRecord) {
     throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
   }
@@ -173,7 +190,7 @@ export async function deleteResume(
   resumeId: string,
   userId: string,
 ): Promise<boolean> {
-  const record = await getResumeById(resumeId, userId);
+  const record = await getRawResumeById(resumeId, userId);
 
   const { error, count } = await supabase
     .from("resumes")
@@ -201,3 +218,70 @@ export async function deleteResume(
 
   return isDeleted;
 }
+
+export async function duplicateResume(
+  resumeId: string,
+  userId: string,
+): Promise<ResumeListResponse> {
+  const original = await getRawResumeById(resumeId, userId);
+  if (!original) {
+    throw new NotFoundError("해당 이력서를 찾을 수 없습니다.");
+  }
+
+  const content = JSON.parse(JSON.stringify(original.content));
+
+  const baseTitle = original.title;
+  const escapedTitle = baseTitle
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+  const { data: existingResumes } = await supabase
+    .from("resumes")
+    .select("title")
+    .eq("user_id", userId)
+    .like("title", `${escapedTitle}(%)`);
+
+  let nextNum = 1;
+  if (existingResumes && existingResumes.length > 0) {
+    const numbers = existingResumes
+      .map((r: { title: string }) => {
+        const match = r.title.match(/\((\d+)\)$/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .filter((n: number) => n > 0);
+    if (numbers.length > 0) {
+      nextNum = Math.max(...numbers) + 1;
+    }
+  }
+
+  const newTitle = `${baseTitle}(${nextNum})`;
+
+  if (content.portfolio) {
+    for (const p of content.portfolio) {
+      if (p.fileUrl) {
+        const copiedUrl = await copyPortfolioFile(userId, p.fileUrl);
+        if (copiedUrl) p.fileUrl = copiedUrl;
+      }
+    }
+  }
+
+  const { data: newResume, error: insertError } = await supabase
+    .from("resumes")
+    .insert({
+      user_id: userId,
+      title: newTitle,
+      content: JSON.stringify(content),
+    })
+    .select("id, title, created_at")
+    .single();
+
+  if (insertError) {
+    throw new Error(`이력서 복제 실패: ${insertError.message}`);
+  }
+
+  return {
+    id: newResume.id,
+    title: newResume.title,
+    createdAt: newResume.created_at,
+  };
+}
+

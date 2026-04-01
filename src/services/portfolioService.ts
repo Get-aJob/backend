@@ -64,10 +64,20 @@ export async function uploadPortfolioFile(params: {
 }
 
 function extractObjectPathFromUrl(url: string) {
-  const marker = `/storage/v1/object/public/${PORTFOLIO_BUCKET}/`;
-  const idx = url.indexOf(marker);
-  if (idx === -1) return null;
-  return url.slice(idx + marker.length);
+  const publicMarker = `/storage/v1/object/public/${PORTFOLIO_BUCKET}/`;
+  const publicIdx = url.indexOf(publicMarker);
+  if (publicIdx !== -1) {
+    return url.slice(publicIdx + publicMarker.length);
+  }
+
+  const signMarker = `/storage/v1/object/sign/${PORTFOLIO_BUCKET}/`;
+  const signIdx = url.indexOf(signMarker);
+  if (signIdx !== -1) {
+    const path = url.slice(signIdx + signMarker.length);
+    return path.split("?")[0];
+  }
+
+  return null;
 }
 
 export async function deletePortfolioFilesFromUrls(
@@ -172,5 +182,73 @@ export async function finalizePortfolioFile(
     from: objectPath,
     to: newPath,
   });
+  return publicUrlData.publicUrl;
+}
+
+export async function generateSignedUrl(
+  storedFileUrl: string,
+  expiresIn = 3600, 
+): Promise<string | null> {
+  const objectPath = extractObjectPathFromUrl(storedFileUrl);
+  if (!objectPath) return null;
+
+  const { data, error } = await supabase.storage
+    .from(PORTFOLIO_BUCKET)
+    .createSignedUrl(objectPath, expiresIn);
+
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+
+export async function copyPortfolioFile(
+  userId: string,
+  sourceFileUrl: string,
+): Promise<string | null> {
+  const objectPath = extractObjectPathFromUrl(sourceFileUrl);
+  if (!objectPath) return null;
+
+  const userPrefix = `users/${userId}/`;
+  if (!objectPath.startsWith(userPrefix)) {
+    logger.warn("타인의 포트폴리오 파일 복사 시도가 차단됨", {
+      userId,
+      objectPath,
+    });
+    return null;
+  }
+
+  const extension = objectPath.split(".").pop() || "pdf";
+  const rand = crypto.randomBytes(4).toString("hex");
+  const newPath = `users/${userId}/portfolio-${Date.now()}-${rand}.${extension}`;
+
+  logger.info("포트폴리오 파일 복사 시작", {
+    userId,
+    from: objectPath,
+    to: newPath,
+  });
+
+  const { error } = await supabase.storage
+    .from(PORTFOLIO_BUCKET)
+    .copy(objectPath, newPath);
+
+  if (error) {
+    logger.error("포트폴리오 파일 복사 실패", {
+      userId,
+      from: objectPath,
+      to: newPath,
+      error: error.message,
+    });
+    return null;
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from(PORTFOLIO_BUCKET)
+    .getPublicUrl(newPath);
+
+  logger.info("포트폴리오 파일 복사 성공", {
+    userId,
+    from: objectPath,
+    to: newPath,
+  });
+
   return publicUrlData.publicUrl;
 }

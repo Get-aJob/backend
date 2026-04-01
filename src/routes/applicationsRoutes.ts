@@ -16,18 +16,33 @@ const router = Router();
  * /applications/user:
  *   get:
  *     summary: 사용자 지원 현황 조회
- *     description: 인증된 사용자의 모든 지원 내역을 조회합니다.
+ *     description: 인증된 사용자의 지원 내역을 페이지네이션으로 조회합니다.
  *     tags:
  *       - Applications
  *     security:
  *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: 페이지 크기
+ *       - in: query
+ *         name: offset
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: 시작 위치
  *     responses:
  *       200:
  *         description: 지원 목록 조회 성공
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ApplicationsResponse'
+ *               $ref: '#/components/schemas/ApplicationsByUserResponse'
  *       401:
  *         description: 인증 실패
  */
@@ -238,7 +253,7 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *         notes:
  *           type: string
  *           description: 메모
- *         status:
+ *         statusName:
  *           type: string
  *           nullable: true
  *           description: 지원 상태명
@@ -246,29 +261,62 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *           type: object
  *           nullable: true
  *           description: 연관 채용공고 정보
+ *         histories:
+ *           type: array
+ *           description: 지원 상태 변경 이력 목록
+ *           items:
+ *             type: object
+ *             properties:
+ *               toStatusId:
+ *                 type: string
+ *                 nullable: true
+ *               toStatusName:
+ *                 type: string
+ *                 nullable: true
+ *               changedAt:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
  *     ApplicationResponse:
  *       type: object
  *       properties:
  *         application:
  *           $ref: '#/components/schemas/Application'
- *     ApplicationsResponse:
+ *     ApplicationsByUserResponse:
  *       type: object
  *       properties:
  *         applications:
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/Application'
+ *         pagination:
+ *           type: object
+ *           properties:
+ *             totalCount:
+ *               type: integer
+ *             hasNext:
+ *               type: boolean
+ *             nextOffset:
+ *               type: integer
+ *               nullable: true
+ *             limit:
+ *               type: integer
+ *             offset:
+ *               type: integer
  *     ApplicationStatus:
  *       type: object
  *       properties:
  *         id:
  *           type: string
- *         display_name:
+ *         displayName:
  *           type: string
- *         is_active:
+ *           description: 지원 상태명
+ *         isActive:
  *           type: boolean
- *         display_order:
+ *           description: 활성화 여부
+ *         displayOrder:
  *           type: number
+ *           description: 표시 순서
  *     ApplicationStatusesResponse:
  *       type: object
  *       properties:
