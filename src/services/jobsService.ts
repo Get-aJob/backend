@@ -36,10 +36,13 @@ export async function crawlJob(url: string) {
     );
 
     const responseData = response.data as any;
-    const crawledData =
-      responseData && responseData.success && responseData.data
-        ? (responseData.data as CrawledJob)
-        : (responseData as CrawledJob);
+
+    if (!responseData?.success || !responseData?.data) {
+      const errorMessage = responseData?.message || responseData?.error || '크롤링에 실패했습니다.';
+      throw new Error(errorMessage);
+    }
+
+    const crawledData = responseData.data as CrawledJob;
 
     const rawDeadline = String(crawledData.deadline || "").trim();
     const { deadline, deadlineText } = parseDeadline(rawDeadline);
