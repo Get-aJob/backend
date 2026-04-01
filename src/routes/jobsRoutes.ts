@@ -2,6 +2,13 @@ import { Router } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { optionalAuth } from "../middlewares/optionalAuth";
 import * as jobsController from "../controllers/jobsController";
+import {
+  createDirectJobHandler,
+  updateDirectJobHandler,
+  getDirectJobsHandler,
+  deleteDirectJobHandler,
+} from "../controllers/jobsController";
+
 
 const router = Router();
 
@@ -102,5 +109,149 @@ router.get("/", optionalAuth, jobsController.getJobsHandler);
  *         description: 서버 오류
  */
 router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJobHandler);
+
+/**
+ * @swagger
+ * /jobs/direct:
+ *   post:
+ *     summary: 직접 입력 공고 생성
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, companyName]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               companyName:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               experience:
+ *                 type: string
+ *               companyLogo:
+ *                 type: string
+ *               deadline:
+ *                 type: string
+ *                 format: date
+ *               deadlineText:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               sourceUrl:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: 공고 생성 성공
+ *       400:
+ *         description: 필수 항목 누락
+ *       401:
+ *         description: 인증 필요
+ */
+router.post("/direct", requireAuth, createDirectJobHandler);
+
+/**
+ * @swagger
+ * /jobs/direct:
+ *   get:
+ *     summary: 내 직접 입력 공고 목록 조회
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: 목록 조회 성공
+ */
+router.get("/direct", requireAuth, getDirectJobsHandler);
+
+/**
+ * @swagger
+ * /jobs/direct/{externalId}:
+ *   put:
+ *     summary: 직접 입력 공고 수정
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: externalId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               companyName:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               experience:
+ *                 type: string
+ *               companyLogo:
+ *                 type: string
+ *               deadline:
+ *                 type: string
+ *                 format: date
+ *               deadlineText:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               sourceUrl:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 수정 성공
+ *       400:
+ *         description: 수정할 항목 없음
+ *       401:
+ *         description: 인증 필요
+ *       404:
+ *         description: 공고 없음
+ */
+
+router.put("/direct/:externalId", requireAuth, updateDirectJobHandler);
+
+/**
+ * @swagger
+ * /jobs/direct/{externalId}:
+ *   delete:
+ *     summary: 직접 입력 공고 삭제
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: externalId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: 삭제 성공
+ */
+router.delete("/direct/:externalId", requireAuth, deleteDirectJobHandler);
+
 
 export default router;

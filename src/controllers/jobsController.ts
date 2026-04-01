@@ -1,5 +1,13 @@
 import { Request, Response } from 'express';
 import * as jobsService from '../services/jobsService';
+import {
+  createDirectJob,
+  updateDirectJob,
+  getDirectJobsByUser,
+  deleteDirectJob,
+} from "../services/jobsService";
+
+
 
 export async function manualCrawlHandler(req: Request, res: Response) {
   try {
@@ -80,3 +88,99 @@ export async function deleteManualJobHandler(req: Request, res: Response) {
     res.status(500).json({ error: "공고 삭제 중 오류가 발생했습니다." });
   }
 }
+
+
+const DIRECT_JOB_CREATE_ALLOWED_FIELDS = [
+  "title", "companyName", "location", "experience",
+  "companyLogo", "deadline", "deadlineText", "description", "sourceUrl"
+];
+
+const DIRECT_JOB_UPDATE_ALLOWED_FIELDS = [
+  "title", "companyName", "location", "experience",
+  "companyLogo", "deadline", "deadlineText", "description", "sourceUrl"
+];
+
+export async function createDirectJobHandler(req: Request, res: Response) {
+  const user = res.locals.user;
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const { title, companyName, ...rest } = req.body;
+
+  if (!title || typeof title !== "string") {
+    return res.status(400).json({ error: "title은 필수 항목입니다." });
+  }
+  if (!companyName || typeof companyName !== "string") {
+    return res.status(400).json({ error: "companyName은 필수 항목입니다." });
+  }
+
+  const filteredData: Record<string, any> = { title, companyName };
+  for (const field of DIRECT_JOB_CREATE_ALLOWED_FIELDS) {
+    if (field in rest) filteredData[field] = rest[field];
+  }
+
+  try {
+    const job = await createDirectJob(user.id, filteredData as any);
+    return res.status(201).json(job);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export async function updateDirectJobHandler(req: Request, res: Response) {
+  const user = res.locals.user;
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const externalId = req.params.externalId as string;
+
+  const filteredData: Record<string, any> = {};
+  for (const field of DIRECT_JOB_UPDATE_ALLOWED_FIELDS) {
+    if (field in req.body) filteredData[field] = req.body[field];
+  }
+
+  if (Object.keys(filteredData).length === 0) {
+    return res.status(400).json({ error: "수정할 항목이 없습니다." });
+  }
+
+  try {
+    const job = await updateDirectJob(user.id, externalId, filteredData as any);
+    return res.status(200).json(job);
+  } catch (err: any) {
+    if (err.code === "NOT_FOUND") {
+      return res.status(404).json({ error: "공고를 찾을 수 없습니다." });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export async function getDirectJobsHandler(req: Request, res: Response) {
+  const user = res.locals.user;
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const limit = Math.min(parseInt(String(req.query.limit ?? "20"), 10), 100);
+  const offset = parseInt(String(req.query.offset ?? "0"), 10);
+
+  try {
+    const result = await getDirectJobsByUser(user.id, limit, offset);
+    return res.status(200).json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export async function deleteDirectJobHandler(req: Request, res: Response) {
+  const user = res.locals.user;
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const externalId = req.params.externalId as string;
+
+  try {
+    const deleted = await deleteDirectJob(user.id, externalId);
+    if (!deleted) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없거나 삭제 권한이 없습니다." });
+    }
+    return res.status(204).send();
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
