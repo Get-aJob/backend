@@ -12,13 +12,27 @@ export interface CrawledJob {
   [key: string]: any;
 }
 
-export async function crawlAndSaveJob(url: string, userId: string) {
+function parseDeadline(rawDeadline: string) {
+  let deadline = null;
+  let deadlineText = null;
+
+  if (rawDeadline) {
+    const parsedDate = new Date(rawDeadline);
+    if (!isNaN(parsedDate.getTime()) && /\d/.test(rawDeadline) && rawDeadline.length > 5) {
+      deadline = parsedDate.toISOString();
+    } else {
+      deadlineText = rawDeadline;
+    }
+  }
+
+  return { deadline, deadlineText };
+}
+
+export async function crawlJob(url: string) {
   try {
     const response = await axios.post(
       "https://job-crawler-lj5m.onrender.com/api/jobs/crawl",
-      {
-        url: url,
-      },
+      { url },
     );
 
     const responseData = response.data as any;
@@ -28,57 +42,72 @@ export async function crawlAndSaveJob(url: string, userId: string) {
         : (responseData as CrawledJob);
 
     const rawDeadline = String(crawledData.deadline || "").trim();
-    let deadline = null;
-    let deadlineText = null;
+    const { deadline, deadlineText } = parseDeadline(rawDeadline);
 
-    if (rawDeadline) {
-      const parsedDate = new Date(rawDeadline);
-      if (
-        !isNaN(parsedDate.getTime()) &&
-        /\d/.test(rawDeadline) &&
-        rawDeadline.length > 5
-      ) {
-        deadline = parsedDate.toISOString();
-      } else {
-        deadlineText = rawDeadline;
-      }
-    }
-
-    const jobData = {
+    return {
       title: crawledData.title,
-      company_name: crawledData.company,
-      content: JSON.stringify(crawledData),
-      source_type: "manual",
-      created_by: userId,
-      source_url: url,
-      company_logo: crawledData.companyLogo || crawledData.company_logo || "",
+      companyName: crawledData.company,
+      companyLogo: crawledData.companyLogo || crawledData.company_logo || "",
       location: crawledData.location || null,
       experience: crawledData.experience || null,
-      deadline: deadline,
-      deadline_text: deadlineText,
-      external_id: String(
-        crawledData.externalId || crawledData.external_id || "",
-      ),
+      deadline,
+      deadlineText,
+      sourceUrl: crawledData.link || url,
+      externalId: String(crawledData.externalId || crawledData.external_id || ""),
+      content: crawledData,
     };
-
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .upsert(jobData, {
-        onConflict: "source_type,external_id", // 쉼표 사이 공백 제거
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return data;
   } catch (error: any) {
-    console.error("crawlAndSaveJob error:", error.message);
+    console.error("crawlJob error:", error.message);
     throw error;
   }
 }
+
+export async function saveManualJob(
+  userId: string,
+  data: {
+    title: string;
+    companyName: string;
+    companyLogo?: string;
+    location?: string;
+    experience?: string;
+    deadline?: string | null;
+    deadlineText?: string | null;
+    sourceUrl: string;
+    externalId: string;
+    content?: any;
+  },
+) {
+  try {
+    const jobData = {
+      title: data.title,
+      company_name: data.companyName,
+      company_logo: data.companyLogo || "",
+      location: data.location || null,
+      experience: data.experience || null,
+      deadline: data.deadline || null,
+      deadline_text: data.deadlineText || null,
+      content: JSON.stringify(data.content || {}),
+      source_type: "manual",
+      created_by: userId,
+      source_url: data.sourceUrl,
+      external_id: data.externalId,
+    };
+
+    const { data: saved, error } = await supabase
+      .from(TABLE_NAME)
+      .upsert(jobData, { onConflict: "source_type,external_id" })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return convertKeysToCamel(saved);
+  } catch (error: any) {
+    console.error("saveManualJob error:", error.message);
+    throw error;
+  }
+}
+
 
 export async function getManualJobsByUser(userId: string) {
   const { data, error } = await supabase
