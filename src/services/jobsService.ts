@@ -107,13 +107,29 @@ export async function saveManualJob(
       external_id: data.externalId,
     };
 
-    const { data: saved, error } = await supabase
+    const { data: existing } = await supabase
       .from(TABLE_NAME)
-      .upsert(jobData, { onConflict: "source_type,external_id" })
-      .select()
-      .single();
+      .select("id")
+      .eq("source_type", "manual")
+      .eq("external_id", data.externalId)
+      .eq("created_by", userId)
+      .maybeSingle();
+
+    const { data: saved, error } = existing
+      ? await supabase
+          .from(TABLE_NAME)
+          .update(jobData)
+          .eq("id", existing.id)
+          .select()
+          .single()
+      : await supabase
+          .from(TABLE_NAME)
+          .insert(jobData)
+          .select()
+          .single();
 
     if (error) throw error;
+
 
     return convertKeysToCamel(saved);
   } catch (error: any) {
