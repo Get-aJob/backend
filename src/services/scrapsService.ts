@@ -86,7 +86,7 @@ export async function toggleScrap(userId : string, jobPostingId : string) {
 
 export async function getScrapsByUser(
     userId : string,
-    limit = 20,
+    limit = 30,
     offset = 0,
     sortBy = 'created_at'
 ) {
@@ -96,7 +96,7 @@ export async function getScrapsByUser(
 
     let query = supabase
         .from(TABLE_NAME)
-        .select('*, job_postings(title, content, company_name, company_logo, deadline, location, experience)')
+        .select('*, job_postings(title, content, company_name, company_logo, deadline, location, experience)', { count: 'exact' })
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .order('id', { ascending: false });
@@ -109,7 +109,7 @@ export async function getScrapsByUser(
         ? query
         : query.range(offset, offset + limit - 1);
 
-    const { data, error} = await fetchQuery;
+    const { data, error, count } = await fetchQuery;
 
     if (error) {
         throwSupabaseError(error);
@@ -160,11 +160,22 @@ export async function getScrapsByUser(
         };
     });
 
-    if (sortBy === 'deadline') {
-        return mappedRows
+    const items = sortBy === 'deadline'
+        ? mappedRows
             .sort(compareDeadlineAsc)
-            .slice(offset, offset + limit);
-    }
+            .slice(offset, offset + limit)
+        : mappedRows;
 
-    return mappedRows;
+    const totalCount = count ?? (sortBy === 'deadline' ? mappedRows.length : 0);
+    const hasNext = offset + items.length < totalCount;
+    const nextOffset = hasNext ? offset + items.length : null;
+
+    return {
+        items,
+        totalCount,
+        hasNext,
+        nextOffset,
+        limit,
+        offset,
+    };
 }
