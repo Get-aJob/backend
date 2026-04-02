@@ -13,11 +13,13 @@ import * as jobCommentsController from "../controllers/jobCommentsController";
 
 const router = Router();
 
+
 /**
  * @swagger
- * /jobs/manual:
+ * /jobs/manual/preview:
  *   post:
- *     summary: 수동 채용 공고 크롤링
+ *     summary: 수동 채용 공고 크롤링 미리보기
+ *     description: URL을 크롤링하여 공고 데이터를 반환합니다. DB에 저장하지 않습니다.
  *     tags: [Jobs]
  *     security:
  *       - cookieAuth: []
@@ -27,21 +29,110 @@ const router = Router();
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [url]
  *             properties:
  *               url:
  *                 type: string
  *                 description: 채용 공고 URL
  *     responses:
- *       201:
- *         description: 크롤링 및 저장 성공
+ *       200:
+ *         description: 크롤링 성공 (저장 전 미리보기 데이터 반환)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 preview:
+ *                   type: object
+ *                   properties:
+ *                     title:
+ *                       type: string
+ *                     companyName:
+ *                       type: string
+ *                     companyLogo:
+ *                       type: string
+ *                     location:
+ *                       type: string
+ *                     experience:
+ *                       type: string
+ *                     deadline:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *                     deadlineText:
+ *                       type: string
+ *                       nullable: true
+ *                     sourceUrl:
+ *                       type: string
+ *                     externalId:
+ *                       type: string
+ *                     content:
+ *                       type: object
+ *                       description: 크롤링 원본 데이터
  *       400:
  *         description: URL 누락
  *       401:
  *         description: 인증 실패
  *       500:
- *         description: 서버 오류
+ *         description: 크롤링 오류
  */
-router.post("/manual", requireAuth, jobsController.manualCrawlHandler);
+router.post("/manual/preview", requireAuth, jobsController.manualPreviewHandler);
+
+/**
+ * @swagger
+ * /jobs/manual/save:
+ *   post:
+ *     summary: 수동 채용 공고 저장
+ *     description: 미리보기에서 확인/수정한 공고 데이터를 DB에 저장합니다.
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, companyName, externalId]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               companyName:
+ *                 type: string
+ *               externalId:
+ *                 type: string
+ *                 description: preview 응답에서 받은 externalId 값
+ *               sourceUrl:
+ *                 type: string
+ *               companyLogo:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               experience:
+ *                 type: string
+ *               deadline:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               deadlineText:
+ *                 type: string
+ *                 nullable: true
+ *               content:
+ *                 type: object
+ *                 description: 크롤링 원본 데이터 (preview에서 받은 값 그대로)
+ *     responses:
+ *       201:
+ *         description: 저장 성공
+ *       400:
+ *         description: 필수 항목 누락 (title, companyName, externalId)
+ *       401:
+ *         description: 인증 실패
+ *       500:
+ *         description: 저장 오류
+ */
+router.post("/manual/save", requireAuth, jobsController.manualSaveHandler);
+
+
 
 /**
  * @swagger

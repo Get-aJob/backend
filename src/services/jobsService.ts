@@ -9,76 +9,119 @@ export interface CrawledJob {
   company: string;
   location?: string;
   link?: string;
+  requirements?: string; 
+  preferred?: string;    
   [key: string]: any;
 }
 
-export async function crawlAndSaveJob(url: string, userId: string) {
+function parseDeadline(rawDeadline: string) {
+  let deadline = null;
+  let deadlineText = null;
+
+  if (rawDeadline) {
+    const parsedDate = new Date(rawDeadline);
+    if (!isNaN(parsedDate.getTime()) && /\d/.test(rawDeadline) && rawDeadline.length > 5) {
+      deadline = parsedDate.toISOString();
+    } else {
+      deadlineText = rawDeadline;
+    }
+  }
+
+  return { deadline, deadlineText };
+}
+
+export async function crawlJob(url: string) {
   try {
     const response = await axios.post(
       "https://job-crawler-lj5m.onrender.com/api/jobs/crawl",
-      {
-        url: url,
-      },
+      { url },
     );
 
     const responseData = response.data as any;
-    const crawledData =
-      responseData && responseData.success && responseData.data
-        ? (responseData.data as CrawledJob)
-        : (responseData as CrawledJob);
+
+    if (!responseData?.success || !responseData?.data) {
+      const errorMessage = responseData?.message || responseData?.error || '크롤링에 실패했습니다.';
+      throw new Error(errorMessage);
+    }
+
+    const crawledData = responseData.data as CrawledJob;
+
+    const externalId = String(crawledData.externalId || crawledData.external_id || "").trim();
+      if (!externalId) {
+        throw new Error('크롤링된 공고의 ID를 확인할 수 없습니다.');
+      }
 
     const rawDeadline = String(crawledData.deadline || "").trim();
-    let deadline = null;
-    let deadlineText = null;
+    const { deadline, deadlineText } = parseDeadline(rawDeadline);
 
-    if (rawDeadline) {
-      const parsedDate = new Date(rawDeadline);
-      if (
-        !isNaN(parsedDate.getTime()) &&
-        /\d/.test(rawDeadline) &&
-        rawDeadline.length > 5
-      ) {
-        deadline = parsedDate.toISOString();
-      } else {
-        deadlineText = rawDeadline;
-      }
-    }
+    const contentParts: string[] = [];
+    if (crawledData.requirements) contentParts.push(`[지원자격]\n${crawledData.requirements}`);
+    if (crawledData.preferred) contentParts.push(`[우대사항]\n${crawledData.preferred}`);
 
-    const jobData = {
+    return {
       title: crawledData.title,
-      company_name: crawledData.company,
-      content: JSON.stringify(crawledData),
-      source_type: "manual",
-      created_by: userId,
-      source_url: url,
-      company_logo: crawledData.companyLogo || crawledData.company_logo || "",
+      companyName: crawledData.company,
+      companyLogo: crawledData.companyLogo || crawledData.company_logo || "",
       location: crawledData.location || null,
       experience: crawledData.experience || null,
-      deadline: deadline,
-      deadline_text: deadlineText,
-      external_id: String(
-        crawledData.externalId || crawledData.external_id || "",
-      ),
+      deadline,
+      deadlineText,
+      sourceUrl: crawledData.link || url,
+      externalId,
+      content: crawledData,
     };
-
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .upsert(jobData, {
-        onConflict: "source_type,external_id", // 쉼표 사이 공백 제거
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return data;
   } catch (error: any) {
-    console.error("crawlAndSaveJob error:", error.message);
+    console.error("crawlJob error:", error.message);
     throw error;
   }
 }
+
+export async function saveManualJob(
+  userId: string,
+  data: {
+    title: string;
+    companyName: string;
+    companyLogo?: string;
+    location?: string;
+    experience?: string;
+    deadline?: string | null;
+    deadlineText?: string | null;
+    sourceUrl: string;
+    externalId: string;
+    content?: any;
+  },
+) {
+  try {
+    const jobData = {
+      title: data.title,
+      company_name: data.companyName,
+      company_logo: data.companyLogo || "",
+      location: data.location || null,
+      experience: data.experience || null,
+      deadline: data.deadline || null,
+      deadline_text: data.deadlineText || null,
+      content: data.content || null,
+      source_type: "manual",
+      created_by: userId,
+      source_url: data.sourceUrl,
+      external_id: data.externalId,
+    };
+
+    const { data: saved, error } = await supabase
+      .from(TABLE_NAME)
+      .upsert(jobData, { onConflict: "source_type,external_id" })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return convertKeysToCamel(saved);
+  } catch (error: any) {
+    console.error("saveManualJob error:", error.message);
+    throw error;
+  }
+}
+
 
 export async function getManualJobsByUser(userId: string) {
   const { data, error } = await supabase

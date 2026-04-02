@@ -8,27 +8,41 @@ import {
 } from "../services/jobsService";
 
 
-
-export async function manualCrawlHandler(req: Request, res: Response) {
+export async function manualPreviewHandler(req: Request, res: Response) {
   try {
     const { url } = req.body;
     const userId = res.locals.user?.id;
 
-    if (!url) {
-      return res.status(400).json({ error: 'URL은 필수입니다.' });
-    }
+    if (!url) return res.status(400).json({ error: 'URL은 필수입니다.' });
+    if (!userId) return res.status(401).json({ error: '인증 정보가 없습니다.' });
 
-    if (!userId) {
-      return res.status(401).json({ error: '인증 정보가 없습니다.' });
-    }
-
-    const job = await jobsService.crawlAndSaveJob(url, userId);
-    res.status(201).json({ job });
+    const preview = await jobsService.crawlJob(url);
+    return res.status(200).json({ preview });
   } catch (error: any) {
-    console.error('POST /api/jobs/manual error:', error);
-    res.status(500).json({ error: '크롤링 또는 저장 중 오류가 발생했습니다.' });
+    console.error('POST /api/jobs/manual/preview error:', error);
+    res.status(500).json({ error: '크롤링 중 오류가 발생했습니다.' });
   }
 }
+
+export async function manualSaveHandler(req: Request, res: Response) {
+  try {
+    const userId = res.locals.user?.id;
+    if (!userId) return res.status(401).json({ error: '인증 정보가 없습니다.' });
+
+    const { title, companyName, sourceUrl, externalId, ...rest } = req.body;
+
+    if (!title) return res.status(400).json({ error: 'title은 필수입니다.' });
+    if (!companyName) return res.status(400).json({ error: 'companyName은 필수입니다.' });
+    if (!externalId) return res.status(400).json({ error: 'externalId는 필수입니다.' });
+
+    const job = await jobsService.saveManualJob(userId, { title, companyName, sourceUrl, externalId, ...rest });
+    return res.status(201).json({ job });
+  } catch (error: any) {
+    console.error('POST /api/jobs/manual/save error:', error);
+    res.status(500).json({ error: '저장 중 오류가 발생했습니다.' });
+  }
+}
+
 
 export async function getJobsHandler(req: Request, res: Response) {
   try {
