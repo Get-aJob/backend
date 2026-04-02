@@ -4,6 +4,41 @@ import { convertKeysToCamel } from "../utils/caseConverter";
 const TABLE_NAME = 'user_interested_jobs';
 const APPLICATION_TABLE_NAME = 'applications';
 
+type ScrapRow = {
+    jobPostingId: string;
+    title: string;
+    companyName: string;
+    deadline: string;
+    location: string;
+    experience: string;
+    isApplied: boolean;
+    expired: boolean;
+    companyLogo: string;
+    createdAt: string;
+};
+
+function compareDeadlineAsc(left: ScrapRow, right: ScrapRow) {
+    const leftRank = left.expired ? 2 : left.deadline === '' ? 1 : 0;
+    const rightRank = right.expired ? 2 : right.deadline === '' ? 1 : 0;
+
+    if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+    }
+
+    const leftDeadline = left.deadline || '9999-12-31';
+    const rightDeadline = right.deadline || '9999-12-31';
+
+    if (leftDeadline !== rightDeadline) {
+        return leftDeadline.localeCompare(rightDeadline);
+    }
+
+    if (left.createdAt !== right.createdAt) {
+        return right.createdAt.localeCompare(left.createdAt);
+    }
+
+    return right.jobPostingId.localeCompare(left.jobPostingId);
+}
+
 function throwSupabaseError(error: { message: string; code?: string }): never {
     const e = new Error(error.message) as Error & { code?: string };
     e.code = error.code;
@@ -62,22 +97,19 @@ export async function getScrapsByUser(
     let query = supabase
         .from(TABLE_NAME)
         .select('*, job_postings(title, content, company_name, company_logo, deadline, location, experience)')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
 
-    if (sortBy === 'deadline') {
-        query = query
-            .order('deadline', {
-                ascending: true,
-                nullsFirst: false,
-                foreignTable: 'job_postings',
-            } as any)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false });
-    } else {
+    if (sortBy !== 'deadline') {
         query = query.order(sortBy, { ascending: false });
     }
 
-    const { data, error} = await query.range(offset, offset + limit - 1);
+    const fetchQuery = sortBy === 'deadline'
+        ? query
+        : query.range(offset, offset + limit - 1);
+
+    const { data, error} = await fetchQuery;
 
     if (error) {
         throwSupabaseError(error);
@@ -109,7 +141,7 @@ export async function getScrapsByUser(
         );
     }
 
-    const mappedRows = convertedData.map((row: any) => {
+    const mappedRows: ScrapRow[] = convertedData.map((row: any) => {
         const jobPostings = row?.jobPostings ?? {};
         const jobPostingId = row?.jobPostingId ?? "";
         const deadline = jobPostings.deadline ? String(jobPostings.deadline).split("T")[0] : "";
@@ -127,6 +159,12 @@ export async function getScrapsByUser(
             createdAt: row?.createdAt ? String(row.createdAt).split("T")[0] : "",
         };
     });
+
+    if (sortBy === 'deadline') {
+        return mappedRows
+            .sort(compareDeadlineAsc)
+            .slice(offset, offset + limit);
+    }
 
     return mappedRows;
 }
