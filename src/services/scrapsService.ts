@@ -2,7 +2,6 @@ import {supabase} from "../lib/supabase";
 import { convertKeysToCamel } from "../utils/caseConverter";
 
 const TABLE_NAME = 'user_interested_jobs';
-const APPLICATION_TABLE_NAME = 'applications';
 
 type ScrapRow = {
     jobPostingId: string;
@@ -17,27 +16,19 @@ type ScrapRow = {
     createdAt: string;
 };
 
-function compareDeadlineAsc(left: ScrapRow, right: ScrapRow) {
-    const leftRank = left.expired ? 2 : left.deadline === '' ? 1 : 0;
-    const rightRank = right.expired ? 2 : right.deadline === '' ? 1 : 0;
-
-    if (leftRank !== rightRank) {
-        return leftRank - rightRank;
-    }
-
-    const leftDeadline = left.deadline || '9999-12-31';
-    const rightDeadline = right.deadline || '9999-12-31';
-
-    if (leftDeadline !== rightDeadline) {
-        return leftDeadline.localeCompare(rightDeadline);
-    }
-
-    if (left.createdAt !== right.createdAt) {
-        return right.createdAt.localeCompare(left.createdAt);
-    }
-
-    return right.jobPostingId.localeCompare(left.jobPostingId);
-}
+type ScrapPageRow = {
+    jobPostingId?: string;
+    title?: string;
+    companyName?: string;
+    deadline?: string | null;
+    location?: string | null;
+    experience?: string | null;
+    isApplied?: boolean;
+    expired?: boolean;
+    companyLogo?: string | null;
+    createdAt?: string | null;
+    totalCount?: number | string | null;
+};
 
 function throwSupabaseError(error: { message: string; code?: string }): never {
     const e = new Error(error.message) as Error & { code?: string };
@@ -86,7 +77,7 @@ export async function toggleScrap(userId : string, jobPostingId : string) {
 
 export async function getScrapsByUser(
     userId : string,
-    limit = 20,
+    limit = 30,
     offset = 0,
     sortBy = 'created_at'
 ) {
@@ -94,77 +85,67 @@ export async function getScrapsByUser(
         timeZone: "Asia/Seoul",
     }).format(new Date());
 
-    let query = supabase
-        .from(TABLE_NAME)
-        .select('*, job_postings(title, content, company_name, company_logo, deadline, location, experience)')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false });
+    const fetchScrapPage = async (pageLimit: number, pageOffset: number) => {
+        const { data, error } = await supabase.rpc('get_user_scraps_page', {
+            p_user_id: userId,
+            p_limit: pageLimit,
+            p_offset: pageOffset,
+            p_sort_by: sortBy,
+        });
 
-    if (sortBy !== 'deadline') {
-        query = query.order(sortBy, { ascending: false });
-    }
-
-    const fetchQuery = sortBy === 'deadline'
-        ? query
-        : query.range(offset, offset + limit - 1);
-
-    const { data, error} = await fetchQuery;
-
-    if (error) {
-        throwSupabaseError(error);
-    }
-
-    const convertedData = convertKeysToCamel<any[]>(data ?? []);
-
-    const postingIds = convertedData
-        .map((row: any) => row?.jobPostingId)
-        .filter((id: any) => typeof id === 'string' && id.length > 0);
-
-    let appliedPostingIdSet = new Set<string>();
-    if (postingIds.length > 0) {
-        const { data: applications, error: applicationsError } = await supabase
-            .from(APPLICATION_TABLE_NAME)
-            .select('job_posting_id, applied_at')
-            .eq('user_id', userId)
-            .in('job_posting_id', postingIds)
-            .not('applied_at', 'is', null);
-
-        if (applicationsError) {
-            throwSupabaseError(applicationsError);
+        if (error) {
+            throwSupabaseError(error);
         }
 
-        appliedPostingIdSet = new Set(
-            (applications ?? []).map((row: any) =>
-                convertKeysToCamel<{ jobPostingId: string }>(row).jobPostingId
-            )
-        );
-    }
+        return convertKeysToCamel<ScrapPageRow[]>(data ?? []);
+    };
 
-    const mappedRows: ScrapRow[] = convertedData.map((row: any) => {
-        const jobPostings = row?.jobPostings ?? {};
-        const jobPostingId = row?.jobPostingId ?? "";
-        const deadline = jobPostings.deadline ? String(jobPostings.deadline).split("T")[0] : "";
+    const pageRows = await fetchScrapPage(limit, offset);
+
+    const resolveTotalCount = async () => {
+        const rawTotalCount = pageRows[0]?.totalCount;
+        if (rawTotalCount !== undefined && rawTotalCount !== null) {
+            return Number(rawTotalCount);
+        }
+
+        if (offset === 0) {
+            return 0;
+        }
+
+        const firstPageRows = await fetchScrapPage(1, 0);
+        return Number(firstPageRows[0]?.totalCount ?? 0);
+    };
+
+    const mappedRows: ScrapRow[] = pageRows.map((row) => {
+        const deadline = row?.deadline ? String(row.deadline).split("T")[0] : "";
+        const createdAtRaw = row?.createdAt ? String(row.createdAt) : "";
 
         return {
-            jobPostingId,
-            title: jobPostings.title ?? "",
-            companyName: jobPostings.companyName ?? "",
+            jobPostingId: row?.jobPostingId ?? "",
+            title: row?.title ?? "",
+            companyName: row?.companyName ?? "",
             deadline,
-            location: jobPostings.location ?? "",
-            experience: jobPostings.experience ?? "",
-            isApplied: appliedPostingIdSet.has(jobPostingId),
-            expired: deadline !== "" && deadline < today,
-            companyLogo: jobPostings.companyLogo ?? "",
-            createdAt: row?.createdAt ? String(row.createdAt).split("T")[0] : "",
+            location: row?.location ?? "",
+            experience: row?.experience ?? "",
+            isApplied: row?.isApplied ?? false,
+            expired: typeof row?.expired === 'boolean' ? row.expired : deadline !== "" && deadline < today,
+            companyLogo: row?.companyLogo ?? "",
+            createdAt: createdAtRaw ? createdAtRaw.split("T")[0] : "",
         };
     });
 
-    if (sortBy === 'deadline') {
-        return mappedRows
-            .sort(compareDeadlineAsc)
-            .slice(offset, offset + limit);
-    }
+    const items = mappedRows;
 
-    return mappedRows;
+    const totalCount = await resolveTotalCount();
+    const hasNext = offset + items.length < totalCount;
+    const nextOffset = hasNext ? offset + items.length : null;
+
+    return {
+        items,
+        totalCount,
+        hasNext,
+        nextOffset,
+        limit,
+        offset,
+    };
 }
