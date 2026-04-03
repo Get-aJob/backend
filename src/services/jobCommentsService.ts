@@ -246,3 +246,40 @@ export async function updateJobPostingComment(
 
   return { ok: true, comment: toApiComment(updatedRow as CommentRow, author) };
 }
+
+export async function deleteJobPostingComment(
+  userId: string,
+  jobPostingId: string,
+  commentId: string,
+): Promise<
+  { ok: true } | { ok: false; code: "COMMENT_NOT_FOUND" | "FORBIDDEN" }
+> {
+  const { data: commentRow, error: commentErr } = await supabase
+    .from("comments")
+    .select("id, user_id")
+    .eq("id", commentId)
+    .eq("job_posting_id", jobPostingId)
+    .maybeSingle();
+
+  if (commentErr) {
+    throw commentErr;
+  }
+  if (!commentRow) {
+    return { ok: false, code: "COMMENT_NOT_FOUND" };
+  }
+  if (commentRow.user_id !== userId) {
+    return { ok: false, code: "FORBIDDEN" };
+  }
+
+  const { error: deleteErr } = await supabase
+    .from("comments")
+    .delete()
+    .eq("id", commentId)
+    .eq("job_posting_id", jobPostingId);
+
+  if (deleteErr) {
+    throw deleteErr;
+  }
+
+  return { ok: true };
+}
