@@ -425,5 +425,58 @@ router.get(
   jobCommentsController.getJobComments,
 );
 
+/**
+ * @swagger
+ * /jobs/{jobId}/comments/{commentId}:
+ *   put:
+ *     summary: 공고 댓글 수정
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 댓글 ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 수정 성공
+ *       400:
+ *         description: path id 형식 오류 또는 content 누락/공백
+ *       401:
+ *         description: 인증 필요
+ *       403:
+ *         description: 본인 댓글 아님
+ *       404:
+ *         description: 대상 댓글 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.put(
+  "/:jobId/comments/:commentId",
+  requireAuth,
+  jobCommentsController.updateJobCommentHandler,
+);
+
 
 export default router;

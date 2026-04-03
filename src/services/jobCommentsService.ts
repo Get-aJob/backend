@@ -185,3 +185,64 @@ export async function listJobPostingComments(
 
   return { ok: true, comments };
 }
+
+export async function updateJobPostingComment(
+  userId: string,
+  jobPostingId: string,
+  commentId: string,
+  rawContent: unknown,
+): Promise<
+  | { ok: true; comment: JobCommentApi }
+  | { ok: false; code: "EMPTY_CONTENT" | "COMMENT_NOT_FOUND" | "FORBIDDEN" }
+> {
+  const content = typeof rawContent === "string" ? rawContent.trim() : "";
+  if (!content) {
+    return { ok: false, code: "EMPTY_CONTENT" };
+  }
+
+  const { data: commentRow, error: commentErr } = await supabase
+    .from("comments")
+    .select("id, job_posting_id, content, created_at, updated_at, user_id")
+    .eq("id", commentId)
+    .eq("job_posting_id", jobPostingId)
+    .maybeSingle();
+
+  if (commentErr) {
+    throw commentErr;
+  }
+  if (!commentRow) {
+    return { ok: false, code: "COMMENT_NOT_FOUND" };
+  }
+  if (commentRow.user_id !== userId) {
+    return { ok: false, code: "FORBIDDEN" };
+  }
+
+  const { data: updatedRow, error: updateErr } = await supabase
+    .from("comments")
+    .update({ content })
+    .eq("id", commentId)
+    .eq("job_posting_id", jobPostingId)
+    .select("id, job_posting_id, content, created_at, updated_at, user_id")
+    .single();
+
+  if (updateErr) {
+    throw updateErr;
+  }
+
+  const { data: userRow, error: userErr } = await supabase
+    .from("users")
+    .select("id, name, profile_image_url")
+    .eq("id", userId)
+    .single();
+  if (userErr) {
+    throw userErr;
+  }
+
+  const author: JobCommentAuthor = {
+    id: userRow.id,
+    name: userRow.name,
+    profileImageUrl: userRow.profile_image_url,
+  };
+
+  return { ok: true, comment: toApiComment(updatedRow as CommentRow, author) };
+}
