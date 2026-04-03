@@ -143,3 +143,50 @@ export async function updateJobCommentHandler(req: Request, res: Response) {
     return res.status(500).json({ error: "댓글 수정 중 오류가 발생했습니다." });
   }
 }
+
+export async function deleteJobCommentHandler(req: Request, res: Response) {
+  try {
+    const userId = res.locals.user?.id as string | undefined;
+    const jobId = req.params.jobId as string;
+    const commentId = req.params.commentId as string;
+
+    if (!userId) {
+      logger.warn("공고 댓글 삭제 거부: 인증 없음");
+      return res.status(401).json({ error: "인증 정보가 없습니다." });
+    }
+    if (!hasValidCommentPathIds(jobId, commentId)) {
+      logger.warn("공고 댓글 삭제 거부: 유효하지 않은 path id", {
+        jobId,
+        commentId,
+      });
+      return res
+        .status(400)
+        .json({ error: "유효한 공고/댓글 ID가 필요합니다." });
+    }
+
+    const result = await jobCommentsService.deleteJobPostingComment(
+      userId,
+      jobId,
+      commentId,
+    );
+
+    if (result.ok) {
+      logger.info("공고 댓글 삭제 성공", { jobId, commentId, userId });
+      return res.status(204).send();
+    }
+    if (result.code === "FORBIDDEN") {
+      logger.warn("공고 댓글 삭제 거부: 본인 아님", { jobId, commentId, userId });
+      return res.status(403).json({ error: "본인 댓글만 삭제할 수 있습니다." });
+    }
+
+    logger.warn("공고 댓글 삭제 거부: 대상 댓글 없음", {
+      jobId,
+      commentId,
+      userId,
+    });
+    return res.status(404).json({ error: "해당 댓글을 찾을 수 없습니다." });
+  } catch (error) {
+    logger.error("DELETE /jobs/:jobId/comments/:commentId 처리 중 오류", { error });
+    return res.status(500).json({ error: "댓글 삭제 중 오류가 발생했습니다." });
+  }
+}

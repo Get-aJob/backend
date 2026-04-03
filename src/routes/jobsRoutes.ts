@@ -478,5 +478,48 @@ router.put(
   jobCommentsController.updateJobCommentHandler,
 );
 
+/**
+ * @swagger
+ * /jobs/{jobId}/comments/{commentId}:
+ *   delete:
+ *     summary: 공고 댓글 삭제
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 댓글 ID
+ *     responses:
+ *       204:
+ *         description: 삭제 성공
+ *       400:
+ *         description: path id 형식 오류
+ *       401:
+ *         description: 인증 필요
+ *       403:
+ *         description: 본인 댓글 아님
+ *       404:
+ *         description: 대상 댓글 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.delete(
+  "/:jobId/comments/:commentId",
+  requireAuth,
+  jobCommentsController.deleteJobCommentHandler,
+);
+
 
 export default router;
