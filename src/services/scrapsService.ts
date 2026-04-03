@@ -17,27 +17,7 @@ type ScrapRow = {
     createdAt: string;
 };
 
-function compareDeadlineAsc(left: ScrapRow, right: ScrapRow) {
-    const leftRank = left.expired ? 2 : left.deadline === '' ? 1 : 0;
-    const rightRank = right.expired ? 2 : right.deadline === '' ? 1 : 0;
-
-    if (leftRank !== rightRank) {
-        return leftRank - rightRank;
-    }
-
-    const leftDeadline = left.deadline || '9999-12-31';
-    const rightDeadline = right.deadline || '9999-12-31';
-
-    if (leftDeadline !== rightDeadline) {
-        return leftDeadline.localeCompare(rightDeadline);
-    }
-
-    if (left.createdAt !== right.createdAt) {
-        return right.createdAt.localeCompare(left.createdAt);
-    }
-
-    return right.jobPostingId.localeCompare(left.jobPostingId);
-}
+const SCRAP_SELECT = '*, job_postings(title, content, company_name, company_logo, deadline, location, experience)';
 
 function throwSupabaseError(error: { message: string; code?: string }): never {
     const e = new Error(error.message) as Error & { code?: string };
@@ -86,7 +66,7 @@ export async function toggleScrap(userId : string, jobPostingId : string) {
 
 export async function getScrapsByUser(
     userId : string,
-    limit = 20,
+    limit = 30,
     offset = 0,
     sortBy = 'created_at'
 ) {
@@ -94,25 +74,161 @@ export async function getScrapsByUser(
         timeZone: "Asia/Seoul",
     }).format(new Date());
 
-    let query = supabase
-        .from(TABLE_NAME)
-        .select('*, job_postings(title, content, company_name, company_logo, deadline, location, experience)')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false });
+    let data: any[] = [];
+    let count = 0;
 
-    if (sortBy !== 'deadline') {
-        query = query.order(sortBy, { ascending: false });
-    }
+    if (sortBy === 'deadline') {
+        const baseCountQuery = supabase
+            .from(TABLE_NAME)
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId);
 
-    const fetchQuery = sortBy === 'deadline'
-        ? query
-        : query.range(offset, offset + limit - 1);
+        const { count: totalCount, error: totalCountError } = await baseCountQuery;
+        if (totalCountError) {
+            throwSupabaseError(totalCountError);
+        }
 
-    const { data, error} = await fetchQuery;
+        count = totalCount ?? 0;
 
-    if (error) {
-        throwSupabaseError(error);
+        const buildSegmentQuery = (segment: 'active' | 'no_deadline' | 'expired') => {
+            let segmentQuery = supabase
+                .from(TABLE_NAME)
+                .select(SCRAP_SELECT, { count: 'exact' })
+                .eq('user_id', userId);
+
+            if (segment === 'active') {
+                segmentQuery = segmentQuery
+                    .not('job_postings.deadline', 'is', null)
+                    .gte('job_postings.deadline', today)
+                    .order('deadline', {
+                        ascending: true,
+                        nullsFirst: false,
+                        referencedTable: 'job_postings',
+                    } as any)
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
+            } else if (segment === 'no_deadline') {
+                segmentQuery = segmentQuery
+                    .is('job_postings.deadline', null)
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
+            } else {
+                segmentQuery = segmentQuery
+                    .not('job_postings.deadline', 'is', null)
+                    .lt('job_postings.deadline', today)
+                    .order('deadline', {
+                        ascending: true,
+                        nullsFirst: false,
+                        referencedTable: 'job_postings',
+                    } as any)
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
+            }
+
+            return segmentQuery;
+        };
+
+        const buildSegmentCountQuery = (segment: 'active' | 'no_deadline' | 'expired') => {
+            let segmentCountQuery = supabase
+                .from(TABLE_NAME)
+                .select('id, job_postings(deadline)', { count: 'exact', head: true })
+                .eq('user_id', userId);
+
+            if (segment === 'active') {
+                segmentCountQuery = segmentCountQuery
+                    .not('job_postings.deadline', 'is', null)
+                    .gte('job_postings.deadline', today);
+            } else if (segment === 'no_deadline') {
+                segmentCountQuery = segmentCountQuery
+                    .is('job_postings.deadline', null);
+            } else {
+                segmentCountQuery = segmentCountQuery
+                    .not('job_postings.deadline', 'is', null)
+                    .lt('job_postings.deadline', today);
+            }
+
+            return segmentCountQuery;
+        };
+
+        const readSegmentWindow = async (
+            segment: 'active' | 'no_deadline' | 'expired',
+            prefixCount: number,
+            requestedStart: number,
+            requestedEnd: number
+        ) => {
+            const countQuery = buildSegmentCountQuery(segment);
+            const { count: segmentCount, error: segmentCountError } = await countQuery;
+
+            if (segmentCountError) {
+                throwSupabaseError(segmentCountError);
+            }
+
+            const safeSegmentCount = segmentCount ?? 0;
+            if (safeSegmentCount === 0) {
+                return { rows: [] as any[], segmentCount: 0 };
+            }
+
+            const segmentStartInGlobal = prefixCount;
+            const segmentEndInGlobal = prefixCount + safeSegmentCount - 1;
+
+            const overlapStart = Math.max(requestedStart, segmentStartInGlobal);
+            const overlapEnd = Math.min(requestedEnd, segmentEndInGlobal);
+            if (overlapStart > overlapEnd) {
+                return { rows: [] as any[], segmentCount: safeSegmentCount };
+            }
+
+            const localStart = overlapStart - segmentStartInGlobal;
+            const localEnd = overlapEnd - segmentStartInGlobal;
+
+            const rowsQuery = buildSegmentQuery(segment).range(localStart, localEnd);
+            const { data: segmentRows, error: segmentRowsError } = await rowsQuery;
+
+            if (segmentRowsError) {
+                throwSupabaseError(segmentRowsError);
+            }
+
+            return {
+                rows: segmentRows ?? [],
+                segmentCount: safeSegmentCount,
+            };
+        };
+
+        const requestedStart = offset;
+        const requestedEnd = offset + limit - 1;
+
+        let runningPrefix = 0;
+
+        const activeResult = await readSegmentWindow('active', runningPrefix, requestedStart, requestedEnd);
+        runningPrefix += activeResult.segmentCount;
+
+        const noDeadlineResult = await readSegmentWindow('no_deadline', runningPrefix, requestedStart, requestedEnd);
+        runningPrefix += noDeadlineResult.segmentCount;
+
+        const expiredResult = await readSegmentWindow('expired', runningPrefix, requestedStart, requestedEnd);
+
+        data = [
+            ...activeResult.rows,
+            ...noDeadlineResult.rows,
+            ...expiredResult.rows,
+        ];
+    } else {
+        let query = supabase
+            .from(TABLE_NAME)
+            .select(SCRAP_SELECT, { count: 'exact' })
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .order(sortBy, { ascending: false })
+            .range(offset, offset + limit - 1);
+
+        const { data: pageData, error, count: totalCount } = await query;
+
+        if (error) {
+            throwSupabaseError(error);
+        }
+
+        data = pageData ?? [];
+        count = totalCount ?? 0;
     }
 
     const convertedData = convertKeysToCamel<any[]>(data ?? []);
@@ -160,11 +276,18 @@ export async function getScrapsByUser(
         };
     });
 
-    if (sortBy === 'deadline') {
-        return mappedRows
-            .sort(compareDeadlineAsc)
-            .slice(offset, offset + limit);
-    }
+    const items = mappedRows;
 
-    return mappedRows;
+    const totalCount = count ?? 0;
+    const hasNext = offset + items.length < totalCount;
+    const nextOffset = hasNext ? offset + items.length : null;
+
+    return {
+        items,
+        totalCount,
+        hasNext,
+        nextOffset,
+        limit,
+        offset,
+    };
 }

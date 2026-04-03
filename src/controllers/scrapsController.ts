@@ -43,7 +43,7 @@ export async function getMyScrapsHandler(req: AuthRequest, res: Response) {
 
         const normalizedOrderBy = rawSortBy === 'deadline' ? 'deadline' : 'created_at';
 
-        const parsedLimit = typeof limit === 'string' ? Number(limit) : 20;
+        const parsedLimit = typeof limit === 'string' ? Number(limit) : 30;
         const parsedOffset = typeof offset === 'string' ? Number(offset) : 0;
 
         if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
@@ -53,13 +53,22 @@ export async function getMyScrapsHandler(req: AuthRequest, res: Response) {
             return res.status(400).json({ error: 'offset은 0 이상의 정수여야 합니다.' });
         }
 
-        const scraps = await getScrapsByUser(
+        const result = await getScrapsByUser(
             userId,
             parsedLimit,
             parsedOffset,
             normalizedOrderBy
         );
-        res.status(200).json({ scraps });
+        res.status(200).json({
+            scraps: result.items,
+            pagination: {
+                totalCount: result.totalCount,
+                hasNext: result.hasNext,
+                nextOffset: result.nextOffset,
+                limit: result.limit,
+                offset: result.offset,
+            },
+        });
     } catch (err) {
         console.error('GET /scraps', err);
         res.status(500).json({ error: '스크랩 조회에 실패했습니다.' });
