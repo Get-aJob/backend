@@ -14,6 +14,7 @@ import schedulesRouter from "./routes/schedulesRoutes";
 import scrapsRouter from "./routes/scrapsRoutes";
 import jobsRouter from "./routes/jobsRoutes";
 import portfolioRoutes from "./routes/portfolioRoutes";
+import notificationsRouter from "./routes/notificationsRoutes";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/api", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/", indexRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);
+app.use("/notifications", notificationsRouter);
 app.use("/resumes", resumeRoutes);
 app.use("/applications", applicationRouter);
 app.use("/schedules", schedulesRouter);

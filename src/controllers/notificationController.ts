@@ -4,6 +4,7 @@ import {
   InvalidCursorError,
 } from "../utils/notificationCursor";
 import { normalizeNotificationsLimit } from "../constants/notifications";
+import { listNotificationsForUser } from "../services/notificationService";
 
 export async function getNotificationsHandler(req: Request, res: Response) {
   try {
@@ -17,17 +18,18 @@ export async function getNotificationsHandler(req: Request, res: Response) {
       req.query.unread_only === "true" || req.query.unread_only === "1";
 
     const cursorRaw = req.query.cursor as string | undefined;
-    const decodedCursor = cursorRaw
-      ? decodeNotificationCursor(cursorRaw)
-      : null;
 
     // 여기부터 3단계 서비스 호출로 연결
-    // const result = await notificationsService.listNotificationsForUser(...)
+    const result = await listNotificationsForUser({
+      userId,
+      cursor: cursorRaw,
+      limit,
+      unreadOnly: unread_only,
+    });
 
     return res.status(200).json({
-      notifications: [],
-      next_cursor: null,
-      debug: { limit, unread_only, decodedCursor },
+      notifications: result.notifications,
+      next_cursor: result.next_cursor,
     });
   } catch (error) {
     if (error instanceof InvalidCursorError) {
