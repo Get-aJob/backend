@@ -4,7 +4,10 @@ import {
   InvalidCursorError,
 } from "../utils/notificationCursor";
 import { normalizeNotificationsLimit } from "../constants/notifications";
-import { listNotificationsForUser } from "../services/notificationService";
+import {
+  listNotificationsForUser,
+  getUnreadCountByUser,
+} from "../services/notificationService";
 
 export async function getNotificationsHandler(req: Request, res: Response) {
   try {
@@ -38,5 +41,21 @@ export async function getNotificationsHandler(req: Request, res: Response) {
     return res
       .status(500)
       .json({ error: "알림 목록 조회 중 오류가 발생했습니다." });
+  }
+}
+
+export async function getUnreadCountHandler(req: Request, res: Response) {
+  try {
+    const userId = res.locals.user?.id as string | undefined;
+    if (!userId) {
+      return res.status(401).json({ error: "인증 정보가 없습니다." });
+    }
+
+    const result = await getUnreadCountByUser(userId);
+    return res.status(200).json(result);
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: "미읽음 알림 수 조회 중 오류가 발생했습니다." });
   }
 }

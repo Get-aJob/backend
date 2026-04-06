@@ -30,6 +30,9 @@ export interface IListNotificationsResult {
   next_cursor: string | null;
 }
 
+export interface IGetUnreadCountResult {
+  unreadCount: number;
+}
 /**
  * 3-1: notification_logs 목록 조회 서비스 (RPC 기반)
  * - cursor decode
@@ -88,5 +91,21 @@ export async function listNotificationsForUser({
   return {
     notifications,
     next_cursor,
+  };
+}
+
+export async function getUnreadCountByUser(
+  userId: string,
+): Promise<IGetUnreadCountResult> {
+  const { count, error } = await supabase
+    .from("notification_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null);
+  if (error) {
+    throw error;
+  }
+  return {
+    unreadCount: count ?? 0,
   };
 }

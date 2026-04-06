@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { getNotificationsHandler } from "../controllers/notificationController";
+import {
+  getNotificationsHandler,
+  getUnreadCountHandler,
+} from "../controllers/notificationController";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -43,4 +46,6 @@ const router = Router();
  *         description: 서버 오류
  */
 router.get("/", requireAuth, getNotificationsHandler);
+
+router.get("/unread-count", requireAuth, getUnreadCountHandler);
 export default router;
