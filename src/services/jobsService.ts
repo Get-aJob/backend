@@ -86,34 +86,45 @@ export async function saveManualJob(
     experience?: string;
     deadline?: string | null;
     deadlineText?: string | null;
-    sourceUrl: string;
-    externalId: string;
+    sourceUrl?: string;
+    externalId?: string;
+    description?: string
     content?: any;
   },
 ) {
   try {
+    const externalId = data.externalId || crypto.randomUUID();
+
+    let content = null;
+    if (data.content) {
+      content = data.content;
+    } else if (data.description) {
+      content = { description: data.description };
+    }
+
     const jobData = {
       title: data.title,
       company_name: data.companyName,
       company_logo: data.companyLogo || "",
       location: data.location || null,
       experience: data.experience || null,
-      deadline: data.deadline || null,
+      deadline: data.deadline ? new Date(data.deadline) : null,
       deadline_text: data.deadlineText || null,
-      content: data.content || null,
+      content,
       source_type: "manual",
       created_by: userId,
-      source_url: data.sourceUrl,
-      external_id: data.externalId,
+      source_url: data.sourceUrl || "",
+      external_id: externalId,
     };
 
     const { data: existing } = await supabase
       .from(TABLE_NAME)
       .select("id")
       .eq("source_type", "manual")
-      .eq("external_id", data.externalId)
+      .eq("external_id", externalId)
       .eq("created_by", userId)
       .maybeSingle();
+
 
     const { data: saved, error } = existing
       ? await supabase
@@ -139,20 +150,90 @@ export async function saveManualJob(
 }
 
 
-export async function getManualJobsByUser(userId: string) {
-  const { data, error } = await supabase
+export async function getManualJobsByUser(userId: string, limit: number = 20, offset: number = 0) {
+  const { data, error, count } = await supabase
     .from(TABLE_NAME)
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("created_by", userId)
     .eq("source_type", "manual")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     throw error;
   }
 
-  return data || [];
+  return {
+    jobs: (data ?? []).map(convertKeysToCamel),
+    totalCount: count ?? 0,
+  };
 }
+
+
+export async function updateManualJob(
+  userId: string,
+  externalId: string,
+  data: {
+    title?: string;
+    companyName?: string;
+    location?: string;
+    experience?: string;
+    companyLogo?: string;
+    deadline?: string;
+    deadlineText?: string;
+    description?: string;
+    sourceUrl?: string;
+  }
+) {
+  const { data: existing, error: fetchError } = await supabase
+    .from(TABLE_NAME)
+    .select("id, content")
+    .eq("source_type", "manual")
+    .eq("external_id", externalId)
+    .eq("created_by", userId)
+    .single();
+
+  if (fetchError || !existing) {
+    const e = new Error("Not found") as Error & { code?: string };
+    e.code = "NOT_FOUND";
+    throw e;
+  }
+
+  const updatePayload: Record<string, any> = {};
+  if (data.title !== undefined) updatePayload.title = data.title;
+  if (data.companyName !== undefined) updatePayload.company_name = data.companyName;
+  if (data.location !== undefined) updatePayload.location = data.location;
+  if (data.experience !== undefined) updatePayload.experience = data.experience;
+  if (data.companyLogo !== undefined) updatePayload.company_logo = data.companyLogo;
+  if (data.deadlineText !== undefined) updatePayload.deadline_text = data.deadlineText;
+  if (data.sourceUrl !== undefined) updatePayload.source_url = data.sourceUrl;
+  if (data.deadline !== undefined)
+    updatePayload.deadline = data.deadline ? new Date(data.deadline) : null;
+  if (data.description !== undefined) {
+    const prevContent = typeof existing.content === "string"
+      ? JSON.parse(existing.content || "{}")
+      : (existing.content || {});
+    updatePayload.content = { ...prevContent, description: data.description };
+  }
+
+  const { data: updated, error } = await supabase
+    .from(TABLE_NAME)
+    .update(updatePayload)
+    .eq("source_type", "manual")
+    .eq("external_id", externalId)
+    .eq("created_by", userId)
+    .select()
+    .single();
+
+  if (error) {
+    const e = new Error(error.message) as Error & { code?: string };
+    e.code = error.code;
+    throw e;
+  }
+
+  return convertKeysToCamel(updated);
+}
+
 
 export async function getAutoJobs(limit: number = 50, offset: number = 0) {
   const { data, count, error } = await supabase
@@ -200,159 +281,6 @@ export async function deleteManualJob(userId: string, externalId: string) {
     if (error.code === "PGRST116") {
       return null;
     }
-    throw error;
-  }
-
-  return data;
-}
-
-
-export async function createDirectJob(
-  userId: string,
-  data: {
-    title: string;
-    companyName: string;
-    location?: string;
-    experience?: string;
-    companyLogo?: string;
-    deadline?: string;       
-    deadlineText?: string;
-    description?: string;    
-    sourceUrl?: string;       
-  }
-) {
-  const externalId = crypto.randomUUID(); 
-
-  const { data: job, error } = await supabase
-    .from("job_postings")
-    .insert({
-      title: data.title,
-      company_name: data.companyName,
-      location: data.location,
-      experience: data.experience,
-      company_logo: data.companyLogo,
-      deadline: data.deadline ? new Date(data.deadline) : null,
-      deadline_text: data.deadlineText,
-      content: JSON.stringify({ description: data.description }),
-      source_url: data.sourceUrl ?? "",
-      source_type: "direct",
-      source_site_name: null,
-      external_id: externalId,
-      created_by: userId,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    const e = new Error(error.message) as Error & { code?: string };
-    e.code = error.code;
-    throw e;
-  }
-
-  return convertKeysToCamel(job);
-}
-
-// 직접 입력 공고 수정
-export async function updateDirectJob(
-  userId: string,
-  externalId: string,
-  data: {
-    title?: string;
-    companyName?: string;
-    location?: string;
-    experience?: string;
-    companyLogo?: string;
-    deadline?: string;
-    deadlineText?: string;
-    description?: string;
-    sourceUrl?: string;
-  }
-) {
-
-  const { data: existing, error: fetchError } = await supabase
-    .from("job_postings")
-    .select("id, content")
-    .eq("source_type", "direct")
-    .eq("external_id", externalId)
-    .eq("created_by", userId)
-    .single();
-
-  if (fetchError || !existing) {
-    const e = new Error("Not found") as Error & { code?: string };
-    e.code = "NOT_FOUND";
-    throw e;
-  }
-
-  const updatePayload: Record<string, any> = {};
-  if (data.title !== undefined) updatePayload.title = data.title;
-  if (data.companyName !== undefined) updatePayload.company_name = data.companyName;
-  if (data.location !== undefined) updatePayload.location = data.location;
-  if (data.experience !== undefined) updatePayload.experience = data.experience;
-  if (data.companyLogo !== undefined) updatePayload.company_logo = data.companyLogo;
-  if (data.deadlineText !== undefined) updatePayload.deadline_text = data.deadlineText;
-  if (data.sourceUrl !== undefined) updatePayload.source_url = data.sourceUrl;
-  if (data.deadline !== undefined)
-    updatePayload.deadline = data.deadline ? new Date(data.deadline) : null;
-  if (data.description !== undefined) {
-    const prevContent = JSON.parse(existing.content || "{}");
-    updatePayload.content = JSON.stringify({ ...prevContent, description: data.description });
-  }
-
-  const { data: updated, error } = await supabase
-    .from("job_postings")
-    .update(updatePayload)
-    .eq("source_type", "direct")
-    .eq("external_id", externalId)
-    .eq("created_by", userId)
-    .select()
-    .single();
-
-  if (error) {
-    const e = new Error(error.message) as Error & { code?: string };
-    e.code = error.code;
-    throw e;
-  }
-
-  return convertKeysToCamel(updated);
-}
-
-export async function getDirectJobsByUser(
-  userId: string,
-  limit: number = 20,
-  offset: number = 0
-) {
-  const { data: jobs, error, count } = await supabase
-    .from("job_postings")
-    .select("*", { count: "exact" })
-    .eq("source_type", "direct")
-    .eq("created_by", userId)
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
-
-  if (error) {
-    const e = new Error(error.message) as Error & { code?: string };
-    e.code = error.code;
-    throw e;
-  }
-
-  return {
-    jobs: (jobs ?? []).map(convertKeysToCamel),
-    totalCount: count ?? 0,
-  };
-}
-
-export async function deleteDirectJob(userId: string, externalId: string) {
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .delete()
-    .eq("source_type", "direct")
-    .eq("external_id", externalId)
-    .eq("created_by", userId)
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") return null; // 없는 경우
     throw error;
   }
 
