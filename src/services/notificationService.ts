@@ -33,6 +33,17 @@ export interface IListNotificationsResult {
 export interface IGetUnreadCountResult {
   unreadCount: number;
 }
+
+export interface IMarkOneReadResult {
+  ok: boolean;
+  notification?: INotificationLogRow;
+  code?: "NOT_FOUND";
+}
+
+export interface IMarkAllReadResult {
+  ok: boolean;
+  updatedCount: number;
+}
 /**
  * 3-1: notification_logs 목록 조회 서비스 (RPC 기반)
  * - cursor decode
@@ -107,5 +118,71 @@ export async function getUnreadCountByUser(
   }
   return {
     unreadCount: count ?? 0,
+  };
+}
+
+export async function markNotificationAsRead(
+  userId: string,
+  notificationId: string,
+): Promise<IMarkOneReadResult> {
+  const { data: existing, error: existingErr } = await supabase
+    .from("notification_logs")
+    .select("id, user_id, type, title, body, payload, read_at, sent_at, created_at")
+    .eq("id", notificationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingErr) {
+    throw existingErr;
+  }
+  if (!existing) {
+    return { ok: false, code: "NOT_FOUND" };
+  }
+
+  if (existing.read_at) {
+    return { ok: true, notification: existing as INotificationLogRow };
+  }
+
+  const { data: updated, error: updateErr } = await supabase
+    .from("notification_logs")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId)
+    .eq("user_id", userId)
+    .select("id, user_id, type, title, body, payload, read_at, sent_at, created_at")
+    .single();
+
+  if (updateErr) {
+    throw updateErr;
+  }
+
+  return { ok: true, notification: updated as INotificationLogRow };
+}
+
+export async function markAllNotificationsAsRead(
+  userId: string,
+): Promise<IMarkAllReadResult> {
+  const { count, error: countErr } = await supabase
+    .from("notification_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null);
+
+  if (countErr) {
+    throw countErr;
+  }
+
+  const { error } = await supabase
+    .from("notification_logs")
+    .update({ read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("read_at", null);
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    ok: true,
+    updatedCount: count ?? 0,
   };
 }
