@@ -163,6 +163,35 @@ router.get("/manual", requireAuth, jobsController.getManualJobsHandler);
 /**
  * @swagger
  * /jobs/manual/{externalId}:
+ *   get:
+ *     summary: 수동 공고 단건 조회
+ *     description: 본인이 등록한 수동 공고를 externalId로 조회합니다.
+ *     tags: [Jobs]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: externalId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 조회할 공고의 external_id
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *       401:
+ *         description: 인증 실패
+ *       404:
+ *         description: 공고 없음 또는 조회 권한 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.get("/manual/:externalId", requireAuth, jobsController.getManualJobHandler);
+
+
+/**
+ * @swagger
+ * /jobs/manual/{externalId}:
  *   put:
  *     summary: 수동 공고 수정
  *     description: 본인이 등록한 수동 공고를 수정합니다.
@@ -280,6 +309,34 @@ router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJob
  *         description: 서버 오류
  */
 router.get("/", optionalAuth, jobsController.getJobsHandler);
+
+/**
+ * @swagger
+ * /jobs/{jobId}:
+ *   get:
+ *     summary: 채용 공고 단건 조회
+ *     description: 공고 UUID로 단건 조회합니다. auto/manual 구분 없이 사용 가능합니다.
+ *     tags: [Jobs]
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *       400:
+ *         description: jobId 형식 오류
+ *       404:
+ *         description: 공고 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.get("/:jobId", optionalAuth, jobsController.getJobByIdHandler);
+
 
 /**
  * @swagger

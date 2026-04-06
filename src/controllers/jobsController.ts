@@ -146,3 +146,40 @@ export async function getManualJobsHandler(req: Request, res: Response) {
   }
 }
 
+export async function getManualJobHandler(req: Request, res: Response) {
+  const user = res.locals.user;
+  if (!user) return res.status(401).json({ error: "인증 정보가 없습니다." });
+
+  const externalId = req.params.externalId as string;
+
+  try {
+    const job = await jobsService.getManualJobByExternalId(user.id, externalId);
+    if (!job) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없습니다." });
+    }
+    return res.status(200).json({ job });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getJobByIdHandler(req: Request, res: Response) {
+  const jobId = req.params.jobId as string;
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(jobId)) {
+    return res.status(400).json({ error: "jobId 형식이 올바르지 않습니다." });
+  }
+
+  try {
+    const job = await jobsService.getJobById(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없습니다." });
+    }
+    return res.status(200).json({ job });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+

@@ -267,6 +267,39 @@ export async function getAutoJobs(limit: number = 50, offset: number = 0) {
   };
 }
 
+export async function getManualJobByExternalId(userId: string, externalId: string) {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select("*")
+    .eq("source_type", "manual")
+    .eq("external_id", externalId)
+    .eq("created_by", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  return convertKeysToCamel(data);
+}
+
+export async function getJobById(jobId: string) {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select("*")
+    .eq("id", jobId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  return convertKeysToCamel(data);
+}
+
+
 export async function deleteManualJob(userId: string, externalId: string) {
   const { data, error, count } = await supabase
     .from(TABLE_NAME)
