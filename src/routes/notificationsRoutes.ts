@@ -47,5 +47,29 @@ const router = Router();
  */
 router.get("/", requireAuth, getNotificationsHandler);
 
+/**
+ * @swagger
+ * /notifications/unread-count:
+ *   get:
+ *     summary: 내 미읽음 알림 개수 조회
+ *     tags: [Notifications]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 unread_count:
+ *                   type: integer
+ *                   example: 3
+ *       401:
+ *         description: 인증 필요
+ *       500:
+ *         description: 서버 오류
+ */
 router.get("/unread-count", requireAuth, getUnreadCountHandler);
 export default router;
