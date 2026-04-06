@@ -261,7 +261,7 @@ export async function getAutoJobs(limit: number = 50, offset: number = 0) {
   );
 
   return {
-    jobs: data || [],
+    jobs: (data ?? []).map(convertKeysToCamel),
     totalCount: count || 0,
     sourceSites,
   };

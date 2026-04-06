@@ -133,8 +133,10 @@ export async function getManualJobsHandler(req: Request, res: Response) {
   const user = res.locals.user;
   if (!user) return res.status(401).json({ error: "인증 정보가 없습니다." });
 
-  const limit = Math.min(parseInt(String(req.query.limit ?? "20"), 10), 100);
-  const offset = parseInt(String(req.query.offset ?? "0"), 10);
+  const parsedLimit = parseInt(String(req.query.limit ?? "20"), 10);
+  const parsedOffset = parseInt(String(req.query.offset ?? "0"), 10);
+  const limit = Math.min(isNaN(parsedLimit) || parsedLimit < 1 ? 20 : parsedLimit, 100);
+  const offset = isNaN(parsedOffset) || parsedOffset < 0 ? 0 : parsedOffset;
 
   try {
     const result = await jobsService.getManualJobsByUser(user.id, limit, offset);
