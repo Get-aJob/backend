@@ -243,14 +243,14 @@ export async function getAutoJobs(
     location?: string;
     experience?: string;
     sourceSite?: string;
+    excludeExpired?: boolean;
+    sortBy?: "createdAt" | "deadline" | "viewCount";
   }
 ) {
   let query = supabase
     .from(TABLE_NAME)
     .select("*", { count: "exact" })
-    .eq("source_type", "auto")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .eq("source_type", "auto");
 
   if (filters?.keyword) {
     query = query.or(
@@ -269,6 +269,22 @@ export async function getAutoJobs(
   if (filters?.sourceSite) {
     query = query.eq("source_site_name", filters.sourceSite);
   }
+
+  if (filters?.excludeExpired) {
+    const today = new Date().toISOString();
+    query = query.or(`deadline.is.null,deadline.gte.${today}`);
+  }
+
+  if (filters?.sortBy === "deadline") {
+    query = query
+      .order("deadline", { ascending: true, nullsFirst: false });
+  } else if (filters?.sortBy === "viewCount") {
+    query = query.order("view_count", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
+
+  query = query.range(offset, offset + limit - 1);
 
   const { data, count, error } = await query;
   if (error) throw error;

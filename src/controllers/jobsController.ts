@@ -55,16 +55,24 @@ export async function getJobsHandler(req: Request, res: Response) {
     }
 
     if (sourceType === "auto") {
+      const sortByRaw = req.query.sortBy as string | undefined;
+      const validSortBy = ["createdAt", "deadline", "viewCount"];
+
       const filters = {
         keyword: req.query.keyword as string | undefined,
         location: req.query.location as string | undefined,
         experience: req.query.experience as string | undefined,
         sourceSite: req.query.sourceSite as string | undefined,
+        excludeExpired: req.query.excludeExpired === "true",
+        sortBy: validSortBy.includes(sortByRaw ?? "")
+          ? (sortByRaw as "createdAt" | "deadline" | "viewCount")
+          : "createdAt",
       };
 
       Object.keys(filters).forEach((key) => {
-        if (!filters[key as keyof typeof filters]) {
-          delete filters[key as keyof typeof filters];
+        const k = key as keyof typeof filters;
+        if (filters[k] === undefined || filters[k] === "") {
+          delete filters[k];
         }
       });
 

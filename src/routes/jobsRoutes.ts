@@ -310,6 +310,17 @@ router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJob
  *           type: string
  *         description: "출처 사이트 필터 (예: 원티드, 사람인)"
  *       - in: query
+ *         name: excludeExpired
+ *         schema:
+ *           type: boolean
+ *         description: "true 시 마감된 공고 제외 (deadline이 오늘 이전인 공고 숨김)"
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, deadline, viewCount]
+ *         description: "정렬 기준 (createdAt: 최신순, deadline: 마감 임박순, viewCount: 조회수 높은순)"
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
