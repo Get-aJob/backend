@@ -156,8 +156,19 @@ export async function getManualJobsHandler(req: Request, res: Response) {
   const limit = Math.min(isNaN(parsedLimit) || parsedLimit < 1 ? 20 : parsedLimit, 100);
   const offset = isNaN(parsedOffset) || parsedOffset < 0 ? 0 : parsedOffset;
 
+  const sortByRaw = req.query.sortBy as string | undefined;
+  const validSortBy = ["createdAt", "deadline", "viewCount"];
+
+  const filters = {
+    keyword: req.query.keyword as string | undefined,
+    excludeExpired: req.query.excludeExpired === "true",
+    sortBy: validSortBy.includes(sortByRaw ?? "")
+      ? (sortByRaw as "createdAt" | "deadline" | "viewCount")
+      : "createdAt",
+  };
+
   try {
-    const result = await jobsService.getManualJobsByUser(user.id, limit, offset);
+    const result = await jobsService.getManualJobsByUser(user.id, limit, offset, filters);
     return res.status(200).json(result);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

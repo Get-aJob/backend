@@ -149,26 +149,52 @@ export async function saveManualJob(
   }
 }
 
-
-export async function getManualJobsByUser(userId: string, limit: number = 20, offset: number = 0) {
-  const { data, error, count } = await supabase
+export async function getManualJobsByUser(
+  userId: string,
+  limit: number = 20,
+  offset: number = 0,
+  filters?: {
+    keyword?: string;
+    excludeExpired?: boolean;
+    sortBy?: "createdAt" | "deadline" | "viewCount";
+  }
+) {
+  let query = supabase
     .from(TABLE_NAME)
     .select("*", { count: "exact" })
     .eq("created_by", userId)
-    .eq("source_type", "manual")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .eq("source_type", "manual");
 
-  if (error) {
-    throw error;
+  if (filters?.keyword) {
+    query = query.or(
+      `title.ilike.%${filters.keyword}%,company_name.ilike.%${filters.keyword}%`
+    );
   }
+
+  if (filters?.excludeExpired) {
+    const today = new Date().toISOString();
+    query = query.or(`deadline.is.null,deadline.gte.${today}`);
+  }
+
+  if (filters?.sortBy === "deadline") {
+    query = query.order("deadline", { ascending: true, nullsFirst: false });
+  } else if (filters?.sortBy === "viewCount") {
+    query = query.order("view_count", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
+
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
+
+  if (error) throw error;
 
   return {
     jobs: (data ?? []).map(convertKeysToCamel),
     totalCount: count ?? 0,
   };
 }
-
 
 export async function updateManualJob(
   userId: string,

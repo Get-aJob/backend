@@ -141,6 +141,22 @@ router.post("/manual", requireAuth, jobsController.createManualJobHandler);
  *       - cookieAuth: []
  *     parameters:
  *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: "제목 또는 회사명 검색"
+ *       - in: query
+ *         name: excludeExpired
+ *         schema:
+ *           type: boolean
+ *         description: "true 시 마감된 공고 제외"
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, deadline, viewCount]
+ *         description: "정렬 기준 (createdAt: 최신순, deadline: 마감 임박순, viewCount: 조회수 높은순)"
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
