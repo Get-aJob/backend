@@ -166,8 +166,13 @@ export async function getManualJobsByUser(
     .eq("source_type", "manual");
 
   if (filters?.keyword) {
+    const keyword = filters.keyword
+      .replace(/,/g, "")   
+      .replace(/\./g, "")  
+      .trim();
+
     query = query.or(
-      `title.ilike.%${filters.keyword}%,company_name.ilike.%${filters.keyword}%`
+      `title.ilike.%${keyword}%,company_name.ilike.%${keyword}%`
     );
   }
 
@@ -279,8 +284,13 @@ export async function getAutoJobs(
     .eq("source_type", "auto");
 
   if (filters?.keyword) {
+    const keyword = filters.keyword
+      .replace(/,/g, "")  
+      .replace(/\./g, "") 
+      .trim();
+
     query = query.or(
-      `title.ilike.%${filters.keyword}%,company_name.ilike.%${filters.keyword}%`
+      `title.ilike.%${keyword}%,company_name.ilike.%${keyword}%`
     );
   }
 
