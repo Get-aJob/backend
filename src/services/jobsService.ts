@@ -299,6 +299,31 @@ export async function getJobById(jobId: string) {
   return convertKeysToCamel(data);
 }
 
+export async function incrementViewCount(jobId: string) {
+  const { data: job, error: fetchError } = await supabase
+    .from(TABLE_NAME)
+    .select("id, view_count")
+    .eq("id", jobId)
+    .single();
+
+  if (fetchError) {
+    if (fetchError.code === "PGRST116") return null;
+    throw fetchError;
+  }
+
+  const newCount = (job.view_count ?? 0) + 1;
+
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .update({ view_count: newCount })
+    .eq("id", jobId)
+    .select("id, view_count")
+    .single();
+
+  if (error) throw error;
+
+  return convertKeysToCamel(data);
+}
 
 export async function deleteManualJob(userId: string, externalId: string) {
   const { data, error, count } = await supabase

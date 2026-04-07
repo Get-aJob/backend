@@ -321,7 +321,6 @@ router.get("/", optionalAuth, jobsController.getJobsHandler);
  *       - in: path
  *         name: jobId
  *         required: true
- *         description: 삭제할 공고의 external_id
  *         schema:
  *           type: string
  *           format: uuid
@@ -338,6 +337,39 @@ router.get("/", optionalAuth, jobsController.getJobsHandler);
  */
 router.get("/:jobId", optionalAuth, jobsController.getJobByIdHandler);
 
+/**
+ * @swagger
+ * /jobs/{jobId}/view:
+ *   patch:
+ *     summary: 공고 조회수 증가
+ *     description: 공고 상세 페이지 진입 시 호출하여 조회수를 1 증가시킵니다.
+ *     tags: [Jobs]
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 공고(job_postings) ID
+ *     responses:
+ *       200:
+ *         description: 업데이트 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 viewCount:
+ *                   type: integer
+ *       400:
+ *         description: jobId 형식 오류
+ *       404:
+ *         description: 공고 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.patch("/:jobId/view", jobsController.incrementViewCountHandler);
 
 /**
  * @swagger
