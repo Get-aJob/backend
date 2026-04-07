@@ -321,6 +321,7 @@ router.get("/", optionalAuth, jobsController.getJobsHandler);
  *       - in: path
  *         name: jobId
  *         required: true
+ *         description: 삭제할 공고의 external_id
  *         schema:
  *           type: string
  *           format: uuid
