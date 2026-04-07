@@ -286,10 +286,29 @@ router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJob
  *       - in: query
  *         name: sourceType
  *         required: true
- *         description: 공고 출처 필터 (auto)
  *         schema:
  *           type: string
  *           enum: [auto]
+ *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: "제목 또는 회사명 검색"
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *         description: "지역 필터 (예: 서울, 판교)"
+ *       - in: query
+ *         name: experience
+ *         schema:
+ *           type: string
+ *         description: "경력 필터 (예: 신입, 경력)"
+ *       - in: query
+ *         name: sourceSite
+ *         schema:
+ *           type: string
+ *         description: "출처 사이트 필터 (예: 원티드, 사람인)"
  *       - in: query
  *         name: limit
  *         schema:

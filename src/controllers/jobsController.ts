@@ -44,8 +44,6 @@ export async function createManualJobHandler(req: Request, res: Response) {
   }
 }
 
-
-
 export async function getJobsHandler(req: Request, res: Response) {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
@@ -57,7 +55,20 @@ export async function getJobsHandler(req: Request, res: Response) {
     }
 
     if (sourceType === "auto") {
-      const result = await jobsService.getAutoJobs(limit, offset);
+      const filters = {
+        keyword: req.query.keyword as string | undefined,
+        location: req.query.location as string | undefined,
+        experience: req.query.experience as string | undefined,
+        sourceSite: req.query.sourceSite as string | undefined,
+      };
+
+      Object.keys(filters).forEach((key) => {
+        if (!filters[key as keyof typeof filters]) {
+          delete filters[key as keyof typeof filters];
+        }
+      });
+
+      const result = await jobsService.getAutoJobs(limit, offset, filters);
       return res.status(200).json({
         jobs: result.jobs,
         totalCount: result.totalCount,
@@ -71,7 +82,6 @@ export async function getJobsHandler(req: Request, res: Response) {
     res.status(500).json({ error: "데이터 조회 중 오류가 발생했습니다." });
   }
 }
-
 
 export async function deleteManualJobHandler(req: Request, res: Response) {
   try {

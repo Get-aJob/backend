@@ -235,26 +235,48 @@ export async function updateManualJob(
 }
 
 
-export async function getAutoJobs(limit: number = 50, offset: number = 0) {
-  const { data, count, error } = await supabase
+export async function getAutoJobs(
+  limit: number = 50,
+  offset: number = 0,
+  filters?: {
+    keyword?: string;
+    location?: string;
+    experience?: string;
+    sourceSite?: string;
+  }
+) {
+  let query = supabase
     .from(TABLE_NAME)
     .select("*", { count: "exact" })
     .eq("source_type", "auto")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (error) {
-    throw error;
+  if (filters?.keyword) {
+    query = query.or(
+      `title.ilike.%${filters.keyword}%,company_name.ilike.%${filters.keyword}%`
+    );
   }
 
-  const { data: sitesData, error: sitesError } = await supabase
+  if (filters?.location) {
+    query = query.ilike("location", `%${filters.location}%`);
+  }
+
+  if (filters?.experience) {
+    query = query.ilike("experience", `%${filters.experience}%`);
+  }
+
+  if (filters?.sourceSite) {
+    query = query.eq("source_site_name", filters.sourceSite);
+  }
+
+  const { data, count, error } = await query;
+  if (error) throw error;
+
+  const { data: sitesData } = await supabase
     .from(TABLE_NAME)
     .select("source_site_name")
     .eq("source_type", "auto");
-
-  if (sitesError) {
-    throw sitesError;
-  }
 
   const sourceSites = Array.from(
     new Set(sitesData?.map((item) => item.source_site_name).filter(Boolean))
