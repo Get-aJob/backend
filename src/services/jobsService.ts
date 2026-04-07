@@ -300,29 +300,13 @@ export async function getJobById(jobId: string) {
 }
 
 export async function incrementViewCount(jobId: string) {
-  const { data: job, error: fetchError } = await supabase
-    .from(TABLE_NAME)
-    .select("id, view_count")
-    .eq("id", jobId)
-    .single();
-
-  if (fetchError) {
-    if (fetchError.code === "PGRST116") return null;
-    throw fetchError;
-  }
-
-  const newCount = (job.view_count ?? 0) + 1;
-
   const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .update({ view_count: newCount })
-    .eq("id", jobId)
-    .select("id, view_count")
-    .single();
+    .rpc("increment_view_count", { job_id: jobId });
 
   if (error) throw error;
+  if (!data || data.length === 0) return null;
 
-  return convertKeysToCamel(data);
+  return convertKeysToCamel(data[0]);
 }
 
 export async function deleteManualJob(userId: string, externalId: string) {
