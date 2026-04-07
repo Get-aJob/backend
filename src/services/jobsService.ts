@@ -299,6 +299,15 @@ export async function getJobById(jobId: string) {
   return convertKeysToCamel(data);
 }
 
+export async function incrementViewCount(jobId: string) {
+  const { data, error } = await supabase
+    .rpc("increment_view_count", { job_id: jobId });
+
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+
+  return convertKeysToCamel(data[0]);
+}
 
 export async function deleteManualJob(userId: string, externalId: string) {
   const { data, error, count } = await supabase

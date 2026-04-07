@@ -182,4 +182,23 @@ export async function getJobByIdHandler(req: Request, res: Response) {
   }
 }
 
+export async function incrementViewCountHandler(req: Request, res: Response) {
+  const jobId = req.params.jobId as string;
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(jobId)) {
+    return res.status(400).json({ error: "jobId 형식이 올바르지 않습니다." });
+  }
+
+  try {
+    const result = await jobsService.incrementViewCount(jobId);
+    if (!result) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없습니다." });
+    }
+    return res.status(200).json({ viewCount: (result as any).viewCount });
+  } catch (err: any) {
+    console.error("PATCH /jobs/:jobId/view error:", err);
+    return res.status(500).json({ error: "조회수 업데이트 중 오류가 발생했습니다." });
+  }
+}
 
