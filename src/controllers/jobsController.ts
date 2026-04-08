@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as jobsService from '../services/jobsService';
-import { canIncrementView } from "../utils/viewRateLimit";
+import { canIncrementView, recordView } from "../utils/viewRateLimit";
 
 export async function manualPreviewHandler(req: Request, res: Response) {
   try {
@@ -227,8 +227,12 @@ export async function incrementViewCountHandler(req: Request, res: Response) {
   const identifier = userId ?? ip;
 
   if (!canIncrementView(identifier, jobId)) {
-    const job = await jobsService.getJobById(jobId);
-    return res.status(200).json({ viewCount: (job as any)?.viewCount ?? 0 });
+    try {
+      const job = await jobsService.getJobById(jobId);
+      return res.status(200).json({ viewCount: (job as any)?.viewCount ?? 0 });
+    } catch (err: any) {
+      return res.status(500).json({ error: "조회수 조회 중 오류가 발생했습니다." });
+    }
   }
 
   try {
@@ -236,6 +240,7 @@ export async function incrementViewCountHandler(req: Request, res: Response) {
     if (!result) {
       return res.status(404).json({ error: "해당 공고를 찾을 수 없습니다." });
     }
+    recordView(identifier, jobId);
     return res.status(200).json({ viewCount: (result as any).viewCount });
   } catch (err: any) {
     console.error("PATCH /jobs/:jobId/view error:", err);
