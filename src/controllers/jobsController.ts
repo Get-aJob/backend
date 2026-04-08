@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as jobsService from '../services/jobsService';
+import { canIncrementView } from "../utils/viewRateLimit";
 
 export async function manualPreviewHandler(req: Request, res: Response) {
   try {
@@ -217,6 +218,17 @@ export async function incrementViewCountHandler(req: Request, res: Response) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(jobId)) {
     return res.status(400).json({ error: "jobId 형식이 올바르지 않습니다." });
+  }
+
+  const userId = res.locals.user?.id;
+  const ip = req.headers["x-forwarded-for"] as string
+    || req.socket.remoteAddress
+    || "unknown";
+  const identifier = userId ?? ip;
+
+  if (!canIncrementView(identifier, jobId)) {
+    const job = await jobsService.getJobById(jobId);
+    return res.status(200).json({ viewCount: (job as any)?.viewCount ?? 0 });
   }
 
   try {

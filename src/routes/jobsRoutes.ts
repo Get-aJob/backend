@@ -415,7 +415,7 @@ router.get("/:jobId", optionalAuth, jobsController.getJobByIdHandler);
  *       500:
  *         description: 서버 오류
  */
-router.patch("/:jobId/view", jobsController.incrementViewCountHandler);
+router.patch("/:jobId/view", optionalAuth, jobsController.incrementViewCountHandler);
 
 /**
  * @swagger
