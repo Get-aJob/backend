@@ -1,12 +1,6 @@
 import { Request, Response } from 'express';
 import * as jobsService from '../services/jobsService';
-import {
-  createDirectJob,
-  updateDirectJob,
-  getDirectJobsByUser,
-  deleteDirectJob,
-} from "../services/jobsService";
-
+import { canIncrementView, recordView } from "../utils/viewRateLimit";
 
 export async function manualPreviewHandler(req: Request, res: Response) {
   try {
@@ -24,52 +18,73 @@ export async function manualPreviewHandler(req: Request, res: Response) {
   }
 }
 
-export async function manualSaveHandler(req: Request, res: Response) {
+export async function createManualJobHandler(req: Request, res: Response) {
   try {
     const userId = res.locals.user?.id;
     if (!userId) return res.status(401).json({ error: '인증 정보가 없습니다.' });
 
-    const { title, companyName, sourceUrl, externalId, ...rest } = req.body;
+    const { title, companyName, ...rest } = req.body;
 
     if (!title) return res.status(400).json({ error: 'title은 필수입니다.' });
     if (!companyName) return res.status(400).json({ error: 'companyName은 필수입니다.' });
-    if (!externalId) return res.status(400).json({ error: 'externalId는 필수입니다.' });
 
-    const job = await jobsService.saveManualJob(userId, { title, companyName, sourceUrl, externalId, ...rest });
+    const ALLOWED_FIELDS = [
+      "externalId", "sourceUrl", "companyLogo", "location", "experience",
+      "deadline", "deadlineText", "description", "content",
+    ];
+    const filteredRest: Record<string, any> = {};
+    for (const field of ALLOWED_FIELDS) {
+      if (field in rest) filteredRest[field] = rest[field];
+    }
+
+    const job = await jobsService.saveManualJob(userId, { title, companyName, ...filteredRest });
     return res.status(201).json({ job });
   } catch (error: any) {
-    console.error('POST /api/jobs/manual/save error:', error);
+    console.error('POST /api/jobs/manual error:', error);
     res.status(500).json({ error: '저장 중 오류가 발생했습니다.' });
   }
 }
 
-
 export async function getJobsHandler(req: Request, res: Response) {
   try {
-    const userId = res.locals.user?.id;
-    const sourceType = req.query.sourceType as string;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+    const sourceType = req.query.sourceType as string;
 
     if (!sourceType) {
-      return res.status(400).json({ error: "sourceType 필터가 필수입니다. (auto 또는 manual)" });
+      return res.status(400).json({ error: "sourceType 필터가 필수입니다. (auto)" });
     }
 
     if (sourceType === "auto") {
-      const result = await jobsService.getAutoJobs(limit, offset);
-      return res.status(200).json({ 
+      const sortByRaw = req.query.sortBy as string | undefined;
+      const validSortBy = ["createdAt", "deadline", "viewCount"];
+
+      const filters = {
+        keyword: req.query.keyword as string | undefined,
+        location: req.query.location as string | undefined,
+        experience: req.query.experience as string | undefined,
+        sourceSite: req.query.sourceSite as string | undefined,
+        excludeExpired: req.query.excludeExpired === "true",
+        sortBy: validSortBy.includes(sortByRaw ?? "")
+          ? (sortByRaw as "createdAt" | "deadline" | "viewCount")
+          : "createdAt",
+      };
+
+      Object.keys(filters).forEach((key) => {
+        const k = key as keyof typeof filters;
+        if (filters[k] === undefined || filters[k] === "") {
+          delete filters[k];
+        }
+      });
+
+      const result = await jobsService.getAutoJobs(limit, offset, filters);
+      return res.status(200).json({
         jobs: result.jobs,
         totalCount: result.totalCount,
-        sourceSites: result.sourceSites
+        sourceSites: result.sourceSites,
       });
-    } else if (sourceType === "manual") {
-      if (!userId) {
-        return res.status(401).json({ error: "인증 정보가 없습니다." });
-      }
-      const jobs = await jobsService.getManualJobsByUser(userId);
-      return res.status(200).json({ jobs });
     } else {
-      return res.status(400).json({ error: "유효하지 않은 sourceType입니다. (auto 또는 manual)" });
+      return res.status(400).json({ error: "유효하지 않은 sourceType입니다. (auto)" });
     }
   } catch (error: any) {
     console.error("GET /jobs error:", error);
@@ -103,51 +118,18 @@ export async function deleteManualJobHandler(req: Request, res: Response) {
   }
 }
 
-
-const DIRECT_JOB_CREATE_ALLOWED_FIELDS = [
-  "title", "companyName", "location", "experience",
-  "companyLogo", "deadline", "deadlineText", "description", "sourceUrl"
-];
-
-const DIRECT_JOB_UPDATE_ALLOWED_FIELDS = [
-  "title", "companyName", "location", "experience",
-  "companyLogo", "deadline", "deadlineText", "description", "sourceUrl"
-];
-
-export async function createDirectJobHandler(req: Request, res: Response) {
+export async function updateManualJobHandler(req: Request, res: Response) {
   const user = res.locals.user;
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
-
-  const { title, companyName, ...rest } = req.body;
-
-  if (!title || typeof title !== "string") {
-    return res.status(400).json({ error: "title은 필수 항목입니다." });
-  }
-  if (!companyName || typeof companyName !== "string") {
-    return res.status(400).json({ error: "companyName은 필수 항목입니다." });
-  }
-
-  const filteredData: Record<string, any> = { title, companyName };
-  for (const field of DIRECT_JOB_CREATE_ALLOWED_FIELDS) {
-    if (field in rest) filteredData[field] = rest[field];
-  }
-
-  try {
-    const job = await createDirectJob(user.id, filteredData as any);
-    return res.status(201).json(job);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-};
-
-export async function updateDirectJobHandler(req: Request, res: Response) {
-  const user = res.locals.user;
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  if (!user) return res.status(401).json({ error: "인증 정보가 없습니다." });
 
   const externalId = req.params.externalId as string;
 
+  const ALLOWED_FIELDS = [
+    "title", "companyName", "location", "experience",
+    "companyLogo", "deadline", "deadlineText", "description", "sourceUrl",
+  ];
   const filteredData: Record<string, any> = {};
-  for (const field of DIRECT_JOB_UPDATE_ALLOWED_FIELDS) {
+  for (const field of ALLOWED_FIELDS) {
     if (field in req.body) filteredData[field] = req.body[field];
   }
 
@@ -156,7 +138,7 @@ export async function updateDirectJobHandler(req: Request, res: Response) {
   }
 
   try {
-    const job = await updateDirectJob(user.id, externalId, filteredData as any);
+    const job = await jobsService.updateManualJob(user.id, externalId, filteredData as any);
     return res.status(200).json(job);
   } catch (err: any) {
     if (err.code === "NOT_FOUND") {
@@ -164,37 +146,105 @@ export async function updateDirectJobHandler(req: Request, res: Response) {
     }
     return res.status(500).json({ error: err.message });
   }
-};
+}
 
-export async function getDirectJobsHandler(req: Request, res: Response) {
+export async function getManualJobsHandler(req: Request, res: Response) {
   const user = res.locals.user;
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  if (!user) return res.status(401).json({ error: "인증 정보가 없습니다." });
 
-  const limit = Math.min(parseInt(String(req.query.limit ?? "20"), 10), 100);
-  const offset = parseInt(String(req.query.offset ?? "0"), 10);
+  const parsedLimit = parseInt(String(req.query.limit ?? "20"), 10);
+  const parsedOffset = parseInt(String(req.query.offset ?? "0"), 10);
+  const limit = Math.min(isNaN(parsedLimit) || parsedLimit < 1 ? 20 : parsedLimit, 100);
+  const offset = isNaN(parsedOffset) || parsedOffset < 0 ? 0 : parsedOffset;
+
+  const sortByRaw = req.query.sortBy as string | undefined;
+  const validSortBy = ["createdAt", "deadline", "viewCount"];
+
+  const filters = {
+    keyword: req.query.keyword as string | undefined,
+    excludeExpired: req.query.excludeExpired === "true",
+    sortBy: validSortBy.includes(sortByRaw ?? "")
+      ? (sortByRaw as "createdAt" | "deadline" | "viewCount")
+      : "createdAt",
+  };
 
   try {
-    const result = await getDirectJobsByUser(user.id, limit, offset);
+    const result = await jobsService.getManualJobsByUser(user.id, limit, offset, filters);
     return res.status(200).json(result);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
-};
+}
 
-export async function deleteDirectJobHandler(req: Request, res: Response) {
+export async function getManualJobHandler(req: Request, res: Response) {
   const user = res.locals.user;
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  if (!user) return res.status(401).json({ error: "인증 정보가 없습니다." });
 
   const externalId = req.params.externalId as string;
 
   try {
-    const deleted = await deleteDirectJob(user.id, externalId);
-    if (!deleted) {
-      return res.status(404).json({ error: "해당 공고를 찾을 수 없거나 삭제 권한이 없습니다." });
+    const job = await jobsService.getManualJobByExternalId(user.id, externalId);
+    if (!job) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없습니다." });
     }
-    return res.status(204).send();
+    return res.status(200).json({ job });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getJobByIdHandler(req: Request, res: Response) {
+  const jobId = req.params.jobId as string;
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(jobId)) {
+    return res.status(400).json({ error: "jobId 형식이 올바르지 않습니다." });
+  }
+
+  try {
+    const job = await jobsService.getJobById(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없습니다." });
+    }
+    return res.status(200).json({ job });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function incrementViewCountHandler(req: Request, res: Response) {
+  const jobId = req.params.jobId as string;
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(jobId)) {
+    return res.status(400).json({ error: "jobId 형식이 올바르지 않습니다." });
+  }
+
+  const userId = res.locals.user?.id;
+  const ip = req.headers["x-forwarded-for"] as string
+    || req.socket.remoteAddress
+    || "unknown";
+  const identifier = userId ?? ip;
+
+  if (!canIncrementView(identifier, jobId)) {
+    try {
+      const job = await jobsService.getJobById(jobId);
+      return res.status(200).json({ viewCount: (job as any)?.viewCount ?? 0 });
+    } catch (err: any) {
+      return res.status(500).json({ error: "조회수 조회 중 오류가 발생했습니다." });
+    }
+  }
+
+  try {
+    const result = await jobsService.incrementViewCount(jobId);
+    if (!result) {
+      return res.status(404).json({ error: "해당 공고를 찾을 수 없습니다." });
+    }
+    recordView(identifier, jobId);
+    return res.status(200).json({ viewCount: (result as any).viewCount });
+  } catch (err: any) {
+    console.error("PATCH /jobs/:jobId/view error:", err);
+    return res.status(500).json({ error: "조회수 업데이트 중 오류가 발생했습니다." });
   }
 }
 
