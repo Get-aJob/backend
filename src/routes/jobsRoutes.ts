@@ -141,6 +141,22 @@ router.post("/manual", requireAuth, jobsController.createManualJobHandler);
  *       - cookieAuth: []
  *     parameters:
  *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: "제목 또는 회사명 검색"
+ *       - in: query
+ *         name: excludeExpired
+ *         schema:
+ *           type: boolean
+ *         description: "true 시 마감된 공고 제외"
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, deadline, viewCount]
+ *         description: "정렬 기준 (createdAt: 최신순, deadline: 마감 임박순, viewCount: 조회수 높은순)"
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
@@ -286,10 +302,40 @@ router.delete("/manual/:externalId", requireAuth, jobsController.deleteManualJob
  *       - in: query
  *         name: sourceType
  *         required: true
- *         description: 공고 출처 필터 (auto)
  *         schema:
  *           type: string
  *           enum: [auto]
+ *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: "제목 또는 회사명 검색"
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *         description: "지역 필터 (예: 서울, 판교)"
+ *       - in: query
+ *         name: experience
+ *         schema:
+ *           type: string
+ *         description: "경력 필터 (예: 신입, 경력)"
+ *       - in: query
+ *         name: sourceSite
+ *         schema:
+ *           type: string
+ *         description: "출처 사이트 필터 (예: 원티드, 사람인)"
+ *       - in: query
+ *         name: excludeExpired
+ *         schema:
+ *           type: boolean
+ *         description: "true 시 마감된 공고 제외 (deadline이 오늘 이전인 공고 숨김)"
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, deadline, viewCount]
+ *         description: "정렬 기준 (createdAt: 최신순, deadline: 마감 임박순, viewCount: 조회수 높은순)"
  *       - in: query
  *         name: limit
  *         schema:

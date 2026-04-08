@@ -149,26 +149,57 @@ export async function saveManualJob(
   }
 }
 
-
-export async function getManualJobsByUser(userId: string, limit: number = 20, offset: number = 0) {
-  const { data, error, count } = await supabase
+export async function getManualJobsByUser(
+  userId: string,
+  limit: number = 20,
+  offset: number = 0,
+  filters?: {
+    keyword?: string;
+    excludeExpired?: boolean;
+    sortBy?: "createdAt" | "deadline" | "viewCount";
+  }
+) {
+  let query = supabase
     .from(TABLE_NAME)
     .select("*", { count: "exact" })
     .eq("created_by", userId)
-    .eq("source_type", "manual")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .eq("source_type", "manual");
 
-  if (error) {
-    throw error;
+  if (filters?.keyword) {
+    const keyword = filters.keyword
+      .replace(/,/g, "")   
+      .replace(/\./g, "")  
+      .trim();
+
+    query = query.or(
+      `title.ilike.%${keyword}%,company_name.ilike.%${keyword}%`
+    );
   }
+
+  if (filters?.excludeExpired) {
+    const today = new Date().toISOString();
+    query = query.or(`deadline.is.null,deadline.gte.${today}`);
+  }
+
+  if (filters?.sortBy === "deadline") {
+    query = query.order("deadline", { ascending: true, nullsFirst: false });
+  } else if (filters?.sortBy === "viewCount") {
+    query = query.order("view_count", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
+
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
+
+  if (error) throw error;
 
   return {
     jobs: (data ?? []).map(convertKeysToCamel),
     totalCount: count ?? 0,
   };
 }
-
 
 export async function updateManualJob(
   userId: string,
@@ -235,26 +266,69 @@ export async function updateManualJob(
 }
 
 
-export async function getAutoJobs(limit: number = 50, offset: number = 0) {
-  const { data, count, error } = await supabase
+export async function getAutoJobs(
+  limit: number = 50,
+  offset: number = 0,
+  filters?: {
+    keyword?: string;
+    location?: string;
+    experience?: string;
+    sourceSite?: string;
+    excludeExpired?: boolean;
+    sortBy?: "createdAt" | "deadline" | "viewCount";
+  }
+) {
+  let query = supabase
     .from(TABLE_NAME)
     .select("*", { count: "exact" })
-    .eq("source_type", "auto")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .eq("source_type", "auto");
 
-  if (error) {
-    throw error;
+  if (filters?.keyword) {
+    const keyword = filters.keyword
+      .replace(/,/g, "")  
+      .replace(/\./g, "") 
+      .trim();
+
+    query = query.or(
+      `title.ilike.%${keyword}%,company_name.ilike.%${keyword}%`
+    );
   }
 
-  const { data: sitesData, error: sitesError } = await supabase
+  if (filters?.location) {
+    query = query.ilike("location", `%${filters.location}%`);
+  }
+
+  if (filters?.experience) {
+    query = query.ilike("experience", `%${filters.experience}%`);
+  }
+
+  if (filters?.sourceSite) {
+    query = query.eq("source_site_name", filters.sourceSite);
+  }
+
+  if (filters?.excludeExpired) {
+    const today = new Date().toISOString();
+    query = query.or(`deadline.is.null,deadline.gte.${today}`);
+  }
+
+  if (filters?.sortBy === "deadline") {
+    query = query
+      .order("deadline", { ascending: true, nullsFirst: false });
+  } else if (filters?.sortBy === "viewCount") {
+    query = query.order("view_count", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
+
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, count, error } = await query;
+  if (error) throw error;
+
+  const { data: sitesData } = await supabase
     .from(TABLE_NAME)
     .select("source_site_name")
     .eq("source_type", "auto");
-
-  if (sitesError) {
-    throw sitesError;
-  }
 
   const sourceSites = Array.from(
     new Set(sitesData?.map((item) => item.source_site_name).filter(Boolean))

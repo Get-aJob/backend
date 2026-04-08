@@ -44,8 +44,6 @@ export async function createManualJobHandler(req: Request, res: Response) {
   }
 }
 
-
-
 export async function getJobsHandler(req: Request, res: Response) {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
@@ -57,7 +55,28 @@ export async function getJobsHandler(req: Request, res: Response) {
     }
 
     if (sourceType === "auto") {
-      const result = await jobsService.getAutoJobs(limit, offset);
+      const sortByRaw = req.query.sortBy as string | undefined;
+      const validSortBy = ["createdAt", "deadline", "viewCount"];
+
+      const filters = {
+        keyword: req.query.keyword as string | undefined,
+        location: req.query.location as string | undefined,
+        experience: req.query.experience as string | undefined,
+        sourceSite: req.query.sourceSite as string | undefined,
+        excludeExpired: req.query.excludeExpired === "true",
+        sortBy: validSortBy.includes(sortByRaw ?? "")
+          ? (sortByRaw as "createdAt" | "deadline" | "viewCount")
+          : "createdAt",
+      };
+
+      Object.keys(filters).forEach((key) => {
+        const k = key as keyof typeof filters;
+        if (filters[k] === undefined || filters[k] === "") {
+          delete filters[k];
+        }
+      });
+
+      const result = await jobsService.getAutoJobs(limit, offset, filters);
       return res.status(200).json({
         jobs: result.jobs,
         totalCount: result.totalCount,
@@ -71,7 +90,6 @@ export async function getJobsHandler(req: Request, res: Response) {
     res.status(500).json({ error: "데이터 조회 중 오류가 발생했습니다." });
   }
 }
-
 
 export async function deleteManualJobHandler(req: Request, res: Response) {
   try {
@@ -138,8 +156,19 @@ export async function getManualJobsHandler(req: Request, res: Response) {
   const limit = Math.min(isNaN(parsedLimit) || parsedLimit < 1 ? 20 : parsedLimit, 100);
   const offset = isNaN(parsedOffset) || parsedOffset < 0 ? 0 : parsedOffset;
 
+  const sortByRaw = req.query.sortBy as string | undefined;
+  const validSortBy = ["createdAt", "deadline", "viewCount"];
+
+  const filters = {
+    keyword: req.query.keyword as string | undefined,
+    excludeExpired: req.query.excludeExpired === "true",
+    sortBy: validSortBy.includes(sortByRaw ?? "")
+      ? (sortByRaw as "createdAt" | "deadline" | "viewCount")
+      : "createdAt",
+  };
+
   try {
-    const result = await jobsService.getManualJobsByUser(user.id, limit, offset);
+    const result = await jobsService.getManualJobsByUser(user.id, limit, offset, filters);
     return res.status(200).json(result);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
