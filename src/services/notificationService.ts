@@ -127,7 +127,9 @@ export async function markNotificationAsRead(
 ): Promise<IMarkOneReadResult> {
   const { data: existing, error: existingErr } = await supabase
     .from("notification_logs")
-    .select("id, user_id, type, title, body, payload, read_at, sent_at, created_at")
+    .select(
+      "id, user_id, type, title, body, payload, read_at, sent_at, created_at",
+    )
     .eq("id", notificationId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -148,7 +150,9 @@ export async function markNotificationAsRead(
     .update({ read_at: new Date().toISOString() })
     .eq("id", notificationId)
     .eq("user_id", userId)
-    .select("id, user_id, type, title, body, payload, read_at, sent_at, created_at")
+    .select(
+      "id, user_id, type, title, body, payload, read_at, sent_at, created_at",
+    )
     .single();
 
   if (updateErr) {
@@ -185,4 +189,22 @@ export async function markAllNotificationsAsRead(
     ok: true,
     updatedCount: count ?? 0,
   };
+}
+export async function createNotificationLog(input: {
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  payload?: Record<string, unknown>;
+}) {
+  const { error } = await supabase.from("notification_logs").insert({
+    user_id: input.userId,
+    type: input.type,
+    title: input.title,
+    body: input.body,
+    payload: input.payload ?? {},
+    sent_at: new Date().toISOString(),
+    read_at: null,
+  });
+  if (error) throw error;
 }
