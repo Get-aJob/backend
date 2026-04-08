@@ -1,0 +1,125 @@
+import { Router } from "express";
+import {
+  getNotificationsHandler,
+  getUnreadCountHandler,
+  markAllNotificationsReadHandler,
+  markNotificationReadHandler,
+} from "../controllers/notificationController";
+import { requireAuth } from "../middlewares/requireAuth";
+
+const router = Router();
+
+/**
+ * @swagger
+ * /notifications:
+ *   get:
+ *     summary: 내 알림 목록 조회 (커서 기반)
+ *     tags: [Notifications]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: cursor
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 다음 페이지 조회용 opaque cursor
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: 페이지 크기 (서버에서 최대값 제한)
+ *       - in: query
+ *         name: unread_only
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: true면 미읽음 알림만
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *       400:
+ *         description: 유효하지 않은 cursor
+ *       401:
+ *         description: 인증 필요
+ *       500:
+ *         description: 서버 오류
+ */
+router.get("/", requireAuth, getNotificationsHandler);
+
+/**
+ * @swagger
+ * /notifications/unread-count:
+ *   get:
+ *     summary: 내 미읽음 알림 개수 조회
+ *     tags: [Notifications]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 unread_count:
+ *                   type: integer
+ *                   example: 3
+ *       401:
+ *         description: 인증 필요
+ *       500:
+ *         description: 서버 오류
+ */
+router.get("/unread-count", requireAuth, getUnreadCountHandler);
+
+/**
+ * @swagger
+ * /notifications/{notificationId}/read:
+ *   patch:
+ *     summary: 알림 단건 읽음 처리
+ *     tags: [Notifications]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: notificationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: 처리 성공
+ *       400:
+ *         description: notificationId 형식 오류
+ *       401:
+ *         description: 인증 필요
+ *       404:
+ *         description: 알림 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.patch("/:notificationId/read", requireAuth, markNotificationReadHandler);
+
+/**
+ * @swagger
+ * /notifications/read-all:
+ *   patch:
+ *     summary: 알림 일괄 읽음 처리
+ *     tags: [Notifications]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: 처리 성공
+ *       401:
+ *         description: 인증 필요
+ *       500:
+ *         description: 서버 오류
+ */
+router.patch("/read-all", requireAuth, markAllNotificationsReadHandler);
+
+export default router;
