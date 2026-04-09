@@ -250,6 +250,11 @@ router.delete('/:id', requireAuth, deleteApplicationHandler);
  *           type: string
  *           format: date-time
  *           description: 지원 일시
+ *         statusChangedAt:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           description: 상태 변경 일시
  *         notes:
  *           type: string
  *           description: 메모
