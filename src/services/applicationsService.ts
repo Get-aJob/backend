@@ -258,7 +258,7 @@ export async function updateApplication(
     if (!originalData) {
       return null;
     }
-    console.log("Updating application with payload:", updatePayload);
+  
     const { data: updatedData, error } = await supabase
       .from(TABLE_NAME)
       .update(updatePayload)
