@@ -3,6 +3,7 @@ import "dotenv/config";
 import http from "http";
 import { Server } from "socket.io";
 import app from "./src/app";
+import { attachNotificationIo } from "./src/socket/notificationSocket";
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -19,8 +20,17 @@ const io = new Server(httpServer, {
   },
 });
 
+attachNotificationIo(io);
+
 io.on("connection", (socket) => {
   console.log("connected", socket.id);
+
+  socket.on("notification:subscribe", (userId: unknown) => {
+    if (typeof userId === "string" && userId.length > 0) {
+      void socket.join(`user:${userId}`);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("disconnected", socket.id);
   });
