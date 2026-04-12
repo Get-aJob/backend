@@ -196,15 +196,25 @@ export async function createNotificationLog(input: {
   title: string;
   body: string;
   payload?: Record<string, unknown>;
-}) {
-  const { error } = await supabase.from("notification_logs").insert({
-    user_id: input.userId,
-    type: input.type,
-    title: input.title,
-    body: input.body,
-    payload: input.payload ?? {},
-    sent_at: new Date().toISOString(),
-    read_at: null,
-  });
-  if (error) throw error;
+}): Promise<INotificationLogRow> {
+  const { data, error } = await supabase
+    .from("notification_logs")
+    .insert({
+      user_id: input.userId,
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      payload: input.payload ?? {},
+      sent_at: new Date().toISOString(),
+      read_at: null,
+    })
+    .select(
+      "id, user_id, type, title, body, payload, read_at, sent_at, created_at",
+    )
+    .single();
+
+  if (error) {
+    throw error;
+  }
+  return data as INotificationLogRow;
 }

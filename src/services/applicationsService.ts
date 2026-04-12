@@ -1,9 +1,15 @@
 import { supabase } from "../lib/supabase";
 import { convertKeysToCamel, convertKeysToSnake } from "../utils/caseConverter";
+import { emitNotificationNew } from "../socket/notificationSocket";
 import { createNotificationLog } from "./notificationService";
 
 const TABLE_NAME = "applications";
 const STATUS_TABLE_NAME = "application_status_histories";
+
+/** 프론트 라우팅과 맞춘 지원 상세 경로 (알림 payload.href) */
+function applicationDetailHref(applicationId: string) {
+  return `/applications/${applicationId}`;
+}
 
 function formatDateOnly(value: unknown) {
   if (!value) {
@@ -212,6 +218,7 @@ export async function createApplication(
         applicationId: created?.id,
         jobPostingId: created?.jobPostingId,
         appliedAt: created?.appliedAt,
+        href: applicationDetailHref(String(created?.id ?? "")),
       },
     });
   } catch (e) {
@@ -302,7 +309,34 @@ export async function updateApplication(
     }
   }
 
-  return getApplicationById(data.id);
+  const updated = await getApplicationById(data.id);
+
+  if (hasStatusChanged && updated) {
+    const applicantUserId = updated.userId as string;
+    const statusLabel = (updated.statusName as string | null) ?? statusId ?? "변경됨";
+    const jobTitle = updated.jobPostings?.title ?? "공고";
+
+    try {
+      const notification = await createNotificationLog({
+        userId: applicantUserId,
+        type: "application_status_changed",
+        title: "지원 상태 변경",
+        body: `${jobTitle} 지원이 ${statusLabel} 상태로 변경되었습니다.`,
+        payload: {
+          applicationId: updated.id,
+          jobPostingId: updated.jobPostingId,
+          appliedAt: updated.appliedAt,
+          statusId,
+          href: applicationDetailHref(String(updated.id)),
+        },
+      });
+      emitNotificationNew(applicantUserId, { notification });
+    } catch (e) {
+      console.error("알림 생성 실패(지원 수정은 유지):", e);
+    }
+  }
+
+  return updated;
 }
 
 export async function deleteApplication(id: string) {
