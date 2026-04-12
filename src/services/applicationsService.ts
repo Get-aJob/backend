@@ -245,14 +245,23 @@ export async function updateApplication(
   }
 
   const hasStatusChanged = !!statusId && statusId !== fromStatusId;
+  const nowIso = new Date().toISOString();
+  const updatePayload: Record<string, unknown> = {
+    ...(hasApplicationFieldUpdates
+      ? (convertKeysToSnake(updates) as Record<string, unknown>)
+      : {}),
+    updated_at: nowIso,
+    ...(hasStatusChanged ? { status_changed_at: nowIso } : {}),
+  };
+  const hasApplicationRowUpdates = Object.keys(updatePayload).length > 0;
 
   let data: any = null;
-  if (hasApplicationFieldUpdates) {
+  if (hasApplicationRowUpdates) {
     originalData = await getApplicationById(id);
     if (!originalData) {
       return null;
     }
-
+  
     const { data: updatedData, error } = await supabase
       .from(TABLE_NAME)
       .update(convertKeysToSnake(updates))
@@ -284,7 +293,7 @@ export async function updateApplication(
       await insertStatusHistory(id, statusId, changedByUserId, fromStatusId);
     } catch (err) {
       // 상태 이력 저장 실패 시 수정된 내용을 원복
-      if (hasApplicationFieldUpdates && originalData) {
+      if (hasApplicationRowUpdates && originalData) {
         const { error: rollbackError } = await supabase
           .from(TABLE_NAME)
           .update(
