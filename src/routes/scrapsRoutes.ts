@@ -77,13 +77,16 @@ router.post('/:jobPostingId', requireAuth, toggleScrapHandler);
  *         required: false
  *         schema:
  *           type: integer
- *           default: 20
+ *           default: 30
+ *           minimum: 1
+ *           maximum: 100
  *       - in: query
  *         name: offset
  *         required: false
  *         schema:
  *           type: integer
  *           default: 0
+ *           minimum: 0
  *       - in: query
  *         name: sortBy
  *         required: false
@@ -129,6 +132,33 @@ router.post('/:jobPostingId', requireAuth, toggleScrapHandler);
  *                       createdAt:
  *                         type: string
  *                         example: 2026-03-25
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     totalCount:
+ *                       type: integer
+ *                       description: 전체 스크랩 수
+ *                     hasNext:
+ *                       type: boolean
+ *                       description: 다음 페이지 존재 여부
+ *                     nextOffset:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 다음 페이지 offset (hasNext가 false면 null)
+ *                     limit:
+ *                       type: integer
+ *                     offset:
+ *                       type: integer
+ *       400:
+ *         description: 유효하지 않은 파라미터
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: limit은 1~100 사이의 정수여야 합니다.
  *       401:
  *         description: 인증 실패
  *       500:
