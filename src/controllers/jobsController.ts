@@ -41,7 +41,7 @@ export async function createManualJobHandler(req: Request, res: Response) {
     return res.status(201).json({ job });
   } catch (error: any) {
     console.error('POST /api/jobs/manual error:', error);
-    res.status(500).json({ error: '저장 중 오류가 발생했습니다.' });
+    res.status(500).json({ error: error.message, code: error.code, details: error.details, hint: error.hint });
   }
 }
 
