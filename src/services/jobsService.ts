@@ -1,4 +1,5 @@
 import axios from "axios";
+import { randomUUID } from "crypto";
 import { supabase } from "../lib/supabase";
 import { convertKeysToCamel } from "../utils/caseConverter";
 
@@ -93,7 +94,7 @@ export async function saveManualJob(
   },
 ) {
   try {
-    const externalId = data.externalId || crypto.randomUUID();
+    const externalId = data.externalId || randomUUID();
 
     let content = null;
     if (data.content) {
