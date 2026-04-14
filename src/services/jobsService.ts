@@ -374,12 +374,12 @@ export async function getJobById(jobId: string) {
   return convertKeysToCamel(data);
 }
 
-export async function incrementViewCount(jobId: string) {
+export async function incrementViewCount(jobId: string, identifier: string) {
   const { data, error } = await supabase
-    .rpc("increment_view_count", { job_id: jobId });
+    .rpc("record_and_increment_view", { p_job_id: jobId, p_identifier: identifier });
 
   if (error) throw error;
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) return null; // 공고 없음 → 404
 
   return convertKeysToCamel(data[0]);
 }
