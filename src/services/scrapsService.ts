@@ -128,7 +128,7 @@ export async function getScrapsByUser(
             location: row?.location ?? "",
             experience: row?.experience ?? "",
             isApplied: row?.isApplied ?? false,
-            expired: typeof row?.expired === 'boolean' ? row.expired : deadline !== "" && deadline < today,
+            expired: row?.expired ?? false,
             companyLogo: row?.companyLogo ?? "",
             createdAt: createdAtRaw ? createdAtRaw.split("T")[0] : "",
         };
