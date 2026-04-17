@@ -220,7 +220,9 @@ export async function incrementViewCountHandler(req: Request, res: Response) {
   }
 
   const userId = res.locals.user?.id;
-  const ip = req.headers["x-forwarded-for"] as string
+  const forwardedFor = req.headers["x-forwarded-for"] as string;
+  const ip = (forwardedFor ? forwardedFor.split(",")[0].trim() : null)
+    || req.ip
     || req.socket.remoteAddress
     || "unknown";
   const identifier = userId ?? ip;

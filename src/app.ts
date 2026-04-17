@@ -18,6 +18,8 @@ import notificationsRouter from "./routes/notificationsRoutes";
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 const corpsOptions = {
   origin: [
     "https://job-moa-fe.vercel.app",
